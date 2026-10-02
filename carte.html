@@ -27,7 +27,7 @@
 
         @keyframes pulse-glow {
             from { fill-opacity: 0.55; stroke-width: 2px; filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6)); }
-            to { fill-opacity: 0.90; stroke-width: 3.5px; filter: drop-shadow(0 0 14px rgba(245, 158, 11, 1)); }
+            to { fill-opacity: 0.90; stroke-width: 3.5px; filter: shadow(0 0 14px rgba(245, 158, 11, 1)); }
         }
 
         .leaflet-container { font-family: inherit; }
@@ -75,7 +75,7 @@
                 </button>
 
                 <button onclick="openVercelConfigModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration Vercel DB / .env">
-                    <i data-lucide="database" class="w-4 h-4 text-emerald-400"></i> DB Vercel
+                    <i data-lucide="database" class="w-4 h-4 text-emerald-400"></i> Config & Clés
                 </button>
             </div>
 
@@ -265,7 +265,7 @@
             
             <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                 <div class="flex items-center gap-2 text-emerald-400 font-bold text-base">
-                    <i data-lucide="database" class="w-5 h-5"></i> Configuration Base de Données Vercel KV
+                    <i data-lucide="database" class="w-5 h-5"></i> Configuration Clé API & Vercel
                 </div>
                 <button onclick="closeVercelConfigModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
                     <i data-lucide="x" class="w-5 h-5"></i>
@@ -274,11 +274,19 @@
 
             <div class="p-6 space-y-4 text-xs">
                 <p class="text-slate-300 leading-relaxed">
-                    Entre les identifiants REST de ton instance <strong>Vercel KV</strong> (ou variables <code class="text-emerald-400">.env</code>) pour sauvegarder durablement tes cartes personnalisées sur les serveurs Vercel.
+                    Configure ta clé <strong>Carto.com</strong> et tes identifiants <strong>Vercel KV</strong> pour le chargement des cartes et la sauvegarde de tes défis.
                 </p>
 
+                <div>
+                    <label class="block font-bold text-amber-400 mb-1">Clé API Carto.com (CARTO_API_KEY)</label>
+                    <input type="password" id="carto-key" placeholder="Entre ta clé API Carto..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-amber-500">
+                    <p class="text-[10px] text-slate-500 mt-1">Sera ajoutée à l'URL des fonds de carte CartoDB.</p>
+                </div>
+
+                <hr class="border-slate-800">
+
                 <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
-                    <p>💡 <em>Note : Même sans DB Vercel configurée, tes défis génèrent automatiquement un <strong>lien direct universel</strong> fonctionnel pour tout le monde !</em></p>
+                    <p>💡 <em>Note : Si tu déploies sur Vercel, ajoute <code class="text-emerald-400">CARTO_API_KEY</code> dans tes variables d'environnement <code class="text-emerald-400">.env</code>.</em></p>
                 </div>
 
                 <div>
@@ -416,6 +424,7 @@
         ];
 
         let map;
+        let tileLayerInstance = null;
         let highlightedLayer = null;
         let worldGeoData = null;
         
@@ -431,20 +440,33 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
-            initMap();
-            populateChecklist();
-            checkUrlForSharedChallenge();
+            fetchServerConfig().then(() => {
+                initMap();
+                populateChecklist();
+                checkUrlForSharedChallenge();
+            });
         });
+
+        // Essaye de récupérer dynamiquement la clé .env depuis une API Vercel si elle existe
+        async function fetchServerConfig() {
+            try {
+                const res = await fetch('/api/config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.CARTO_API_KEY) {
+                        localStorage.setItem('CARTO_API_KEY', data.CARTO_API_KEY);
+                    }
+                }
+            } catch (e) {
+                // Pas d'endpoint Vercel API trouvé, continue avec localStorage
+            }
+        }
 
         function initMap() {
             map = L.map('map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 7, zoomControl: false });
             L.control.zoom({ position: 'topright' }).addTo(map);
 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap, CartoDB',
-                subdomains: 'abcd',
-                maxZoom: 19
-            }).addTo(map);
+            updateMapTileLayer();
 
             fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson')
                 .then(res => res.json())
@@ -455,6 +477,23 @@
                     }
                 })
                 .catch(err => console.error("Erreur GeoJSON", err));
+        }
+
+        function updateMapTileLayer() {
+            if (tileLayerInstance) {
+                map.removeLayer(tileLayerInstance);
+            }
+
+            const cartoApiKey = localStorage.getItem('CARTO_API_KEY') || '';
+            const tileUrl = cartoApiKey 
+                ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${cartoApiKey}`
+                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+            tileLayerInstance = L.tileLayer(tileUrl, {
+                attribution: '&copy; OpenStreetMap, CartoDB',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
         }
 
         function loadPresetChallenge() {
@@ -824,6 +863,7 @@
         }
 
         function openVercelConfigModal() {
+            document.getElementById('carto-key').value = localStorage.getItem('CARTO_API_KEY') || '';
             document.getElementById('kv-url').value = localStorage.getItem('VERCEL_KV_REST_API_URL') || '';
             document.getElementById('kv-token').value = localStorage.getItem('VERCEL_KV_REST_API_TOKEN') || '';
             document.getElementById('vercel-modal').classList.remove('hidden');
@@ -834,8 +874,12 @@
         }
 
         function saveVercelKeys() {
+            const cartoKey = document.getElementById('carto-key').value.trim();
             const url = document.getElementById('kv-url').value.trim();
             const token = document.getElementById('kv-token').value.trim();
+
+            if (cartoKey) localStorage.setItem('CARTO_API_KEY', cartoKey);
+            else localStorage.removeItem('CARTO_API_KEY');
 
             if (url) localStorage.setItem('VERCEL_KV_REST_API_URL', url);
             else localStorage.removeItem('VERCEL_KV_REST_API_URL');
@@ -843,7 +887,8 @@
             if (token) localStorage.setItem('VERCEL_KV_REST_API_TOKEN', token);
             else localStorage.removeItem('VERCEL_KV_REST_API_TOKEN');
 
-            alert("Clés Vercel sauvegardées !");
+            updateMapTileLayer();
+            alert("Configuration enregistrée !");
             closeVercelConfigModal();
         }
     </script>
