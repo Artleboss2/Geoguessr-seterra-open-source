@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoMaster - Challenges & Cartes Personnalisées</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        
+        #map { background-color: #0b0f19; z-index: 1; }
+
+        .highlighted-country {
+            fill: #f59e0b !important;
+            fill-opacity: 0.75 !important;
+            stroke: #fef08a !important;
+            stroke-width: 2.5px !important;
+            filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.9));
+            animation: pulse-glow 1.6s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            from { fill-opacity: 0.55; stroke-width: 2px; filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6)); }
+            to { fill-opacity: 0.90; stroke-width: 3.5px; filter: drop-shadow(0 0 14px rgba(245, 158, 11, 1)); }
+        }
+
+        .leaflet-container { font-family: inherit; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col font-sans overflow-hidden select-none">
+
+    <!-- Top Header Navigation -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 shrink-0 shadow-xl z-20">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
+            
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-2 rounded-xl text-slate-950 shadow-lg shadow-amber-500/20">
+                    <i data-lucide="map-pin" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-black text-lg tracking-tight text-white flex items-center gap-2">
+                        GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30">Mode Type-In</span>
+                    </h1>
+                    <p id="mode-subtitle" class="text-xs text-slate-400">Trouve le pays ou la capitale du pays surligné</p>
+                </div>
+            </div>
+
+            <!-- Challenge Preset Selector & Custom Challenge Buttons -->
+            <div class="flex items-center flex-wrap gap-2">
+                <select id="preset-select" onchange="loadPresetChallenge()" class="bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition">
+                    <optgroup label="🌍 Challenges Généraux">
+                        <option value="ALL_COUNTRIES">Tous les pays du Monde (100)</option>
+                        <option value="ALL_CAPITALS">Capitales du Monde (100)</option>
+                    </optgroup>
+                    <optgroup label="🗺️ Cartes par Continent">
+                        <option value="AMERICAS_COUNTRIES">Amériques - Pays (24)</option>
+                        <option value="AMERICAS_CAPITALS">Amériques - Capitales (24)</option>
+                        <option value="EUROPE_COUNTRIES">Europe - Pays (30)</option>
+                        <option value="EUROPE_CAPITALS">Europe - Capitales (30)</option>
+                        <option value="ASIA_COUNTRIES">Asie & Moyen-Orient - Pays (26)</option>
+                        <option value="ASIA_CAPITALS">Asie & Moyen-Orient - Capitales (26)</option>
+                        <option value="AFRICA_COUNTRIES">Afrique - Pays (20)</option>
+                        <option value="AFRICA_CAPITALS">Afrique - Capitales (20)</option>
+                    </optgroup>
+                </select>
+
+                <button onclick="openCustomChallengeModal()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer Challenge
+                </button>
+
+                <button onclick="openVercelConfigModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration Vercel DB / .env">
+                    <i data-lucide="database" class="w-4 h-4 text-emerald-400"></i> DB Vercel
+                </button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="flex items-center gap-3 sm:gap-6 bg-slate-950/80 px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner">
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trouvés</span>
+                    <span id="stat-score" class="font-extrabold text-base text-emerald-400">0</span>
+                </div>
+                <div class="w-px h-5 bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Série</span>
+                    <span id="stat-streak" class="font-extrabold text-base text-amber-400">0 🔥</span>
+                </div>
+                <div class="w-px h-5 bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progression</span>
+                    <span id="stat-progress" class="font-extrabold text-base text-indigo-400">0 / 100</span>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Custom Challenge Active Banner -->
+    <div id="custom-challenge-banner" class="hidden bg-indigo-950/90 border-b border-indigo-500/40 px-4 py-2 text-xs flex items-center justify-between z-10">
+        <div class="flex items-center gap-2 text-indigo-200 font-medium">
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+            <span>Challenge Personnalisé : <strong id="custom-banner-title" class="text-white">--</strong></span>
+            <span id="custom-banner-desc" class="text-indigo-300/80 text-[11px] hidden md:inline"></span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="copyCurrentChallengeShareLink()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition">
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Copier Lien
+            </button>
+            <button onclick="resetToDefaultChallenge()" class="text-indigo-300 hover:text-white text-xs underline">
+                Quitter
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Workspace (Map + Interactive Sidebar) -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden relative">
+
+        <!-- Interactive Map Panel -->
+        <div class="lg:col-span-7 xl:col-span-8 relative h-[45vh] lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800">
+            <div id="map" class="w-full h-full"></div>
+
+            <div class="absolute top-4 left-4 z-[1000] bg-slate-900/90 border border-slate-700/80 backdrop-blur-md px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-300 flex items-center gap-2.5 shadow-xl">
+                <span class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                </span>
+                <span id="target-map-label">Cible surlignée sur la carte</span>
+            </div>
+
+            <div class="absolute bottom-4 left-4 z-[1000] flex flex-wrap gap-2">
+                <button onclick="resetMapView()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+                    <i data-lucide="globe" class="w-4 h-4 text-slate-400"></i> Vue globale
+                </button>
+                <button id="btn-auto-zoom" onclick="toggleAutoZoom()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+                    <i data-lucide="zoom-in" class="w-4 h-4 text-amber-400"></i> <span id="zoom-toggle-text">Zoom Auto : OUI</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar Panel -->
+        <div class="lg:col-span-5 xl:col-span-4 bg-slate-900/95 flex flex-col h-[55vh] lg:h-full overflow-hidden">
+            
+            <div class="p-4 border-b border-slate-800 space-y-3 shrink-0 bg-slate-900">
+                <div class="flex items-center justify-between">
+                    <span id="target-prompt" class="text-xs font-bold uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="help-circle" class="w-4 h-4"></i> Tape le nom du pays
+                    </span>
+                </div>
+
+                <form onsubmit="handleTypeSubmit(event)" class="relative">
+                    <input type="text" id="type-input" placeholder="Tape ta réponse..." autocomplete="off"
+                           class="w-full bg-slate-950 border-2 border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-3 pl-10 text-sm font-medium focus:border-amber-500 focus:outline-none transition shadow-inner">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
+                    <button type="submit" class="absolute right-2 top-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-md transition active:scale-95">
+                        Valider
+                    </button>
+                </form>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <button onclick="revealAnswer()" class="flex-1 bg-slate-800 hover:bg-slate-750 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md">
+                        <i data-lucide="eye" class="w-4 h-4"></i> Révéler la réponse
+                    </button>
+                    <button onclick="skipQuestion()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1 transition active:scale-95">
+                        Passer <i data-lucide="skip-forward" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feedback Notification Banner -->
+            <div id="feedback-banner" class="hidden shrink-0 mx-4 mt-3 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-lg transition-all">
+                <span id="feedback-text" class="flex items-center gap-2"></span>
+                <button id="next-btn" onclick="nextQuestion()" class="hidden bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-xs transition">
+                    Suivant <i data-lucide="arrow-right" class="w-3 h-3 inline"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable List -->
+            <div class="flex-1 p-4 overflow-y-auto min-h-0">
+                <div class="flex items-center justify-between mb-2.5">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ou clique dans la liste :</span>
+                    <span id="country-count" class="text-xs font-semibold text-slate-500 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">0 éléments</span>
+                </div>
+                
+                <div id="country-list" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <!-- List items rendered dynamically -->
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Custom Challenge Creator Modal -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            
+            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i> Créer un Challenge Personnalisé
+                </div>
+                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Titre du Challenge *</label>
+                        <input type="text" id="custom-title" placeholder="ex: Challenge des Capitales d'Europe" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Type de Devinette *</label>
+                        <select id="custom-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                            <option value="COUNTRY">Deviner les Pays</option>
+                            <option value="CAPITAL">Deviner les Capitales</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Description (Optionnel)</label>
+                    <input type="text" id="custom-desc" placeholder="ex: Teste tes connaissances avant l'examen de géo" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                </div>
+
+                <!-- Country Selection Checklist -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-bold text-slate-300">Sélectionne les pays inclus (<span id="selected-count">0</span>/100) :</label>
+                        <div class="flex gap-2">
+                            <button onclick="selectAllCountries(true)" class="text-amber-400 hover:underline text-[11px]">Tout cocher</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="selectAllCountries(false)" class="text-slate-400 hover:underline text-[11px]">Tout décocher</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3 max-h-56 overflow-y-auto" id="country-checklist">
+                        <!-- Checkboxes inserted dynamically -->
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3 shrink-0">
+                <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
+                    Annuler
+                </button>
+                <button onclick="saveAndGenerateChallenge()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-5 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                    <i data-lucide="share-2" class="w-4 h-4"></i> Sauvegarder & Obtenir le Lien
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Vercel Database API Keys / .env Config Modal -->
+    <div id="vercel-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            
+            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <div class="flex items-center gap-2 text-emerald-400 font-bold text-base">
+                    <i data-lucide="database" class="w-5 h-5"></i> Configuration Base de Données Vercel KV
+                </div>
+                <button onclick="closeVercelConfigModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4 text-xs">
+                <p class="text-slate-300 leading-relaxed">
+                    Entre les identifiants REST de ton instance <strong>Vercel KV</strong> (ou variables <code class="text-emerald-400">.env</code>) pour sauvegarder durablement tes cartes personnalisées sur les serveurs Vercel.
+                </p>
+
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
+                    <p>💡 <em>Note : Même sans DB Vercel configurée, tes défis génèrent automatiquement un <strong>lien direct universel</strong> fonctionnel pour tout le monde !</em></p>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">VERCEL_KV_REST_API_URL</label>
+                    <input type="text" id="kv-url" placeholder="https://...kv.vercel-storage.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">VERCEL_KV_REST_API_TOKEN</label>
+                    <input type="password" id="kv-token" placeholder="AXXXXXXXXX..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3 shrink-0">
+                <button onclick="closeVercelConfigModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
+                    Fermer
+                </button>
+                <button onclick="saveVercelKeys()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                    <i data-lucide="save" class="w-4 h-4"></i> Enregistrer Clés
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Comprehensive Database of 100 Countries with Capitals and Aliases
+        const countriesList = [
+            // AMÉRIQUES (24)
+            { id: "CAN", name: "Canada", capital: "Ottawa", region: "Americas", aliases: ["canada", "can"], capitalAliases: ["ottawa"] },
+            { id: "USA", name: "États-Unis", capital: "Washington", region: "Americas", aliases: ["etats unis", "etats-unis", "usa", "us"], capitalAliases: ["washington", "washington dc", "washington d.c."] },
+            { id: "MEX", name: "Mexique", capital: "Mexico", region: "Americas", aliases: ["mexique", "mexico"], capitalAliases: ["mexico", "mexico city"] },
+            { id: "GTM", name: "Guatemala", capital: "Guatemala", region: "Americas", aliases: ["guatemala"], capitalAliases: ["guatemala", "ciudad de guatemala"] },
+            { id: "HND", name: "Honduras", capital: "Tegucigalpa", region: "Americas", aliases: ["honduras"], capitalAliases: ["tegucigalpa"] },
+            { id: "SLV", name: "El Salvador", capital: "San Salvador", region: "Americas", aliases: ["el salvador", "salvador"], capitalAliases: ["san salvador"] },
+            { id: "NIC", name: "Nicaragua", capital: "Managua", region: "Americas", aliases: ["nicaragua"], capitalAliases: ["managua"] },
+            { id: "CRI", name: "Costa Rica", capital: "San José", region: "Americas", aliases: ["costa rica"], capitalAliases: ["san jose", "san josé"] },
+            { id: "PAN", name: "Panama", capital: "Panama", region: "Americas", aliases: ["panama"], capitalAliases: ["panama", "panama city"] },
+            { id: "CUB", name: "Cuba", capital: "La Havane", region: "Americas", aliases: ["cuba"], capitalAliases: ["la havane", "havane", "habana"] },
+            { id: "HTI", name: "Haïti", capital: "Port-au-Prince", region: "Americas", aliases: ["haiti"], capitalAliases: ["port au prince", "port-au-prince"] },
+            { id: "DOM", name: "République dominicaine", capital: "Saint-Domingue", region: "Americas", aliases: ["republique dominicaine", "rep dom"], capitalAliases: ["saint domingue", "santo domingo"] },
+            { id: "COL", name: "Colombie", capital: "Bogota", region: "Americas", aliases: ["colombie"], capitalAliases: ["bogota", "bogotá"] },
+            { id: "VEN", name: "Venezuela", capital: "Caracas", region: "Americas", aliases: ["venezuela"], capitalAliases: ["caracas"] },
+            { id: "GUY", name: "Guyana", capital: "Georgetown", region: "Americas", aliases: ["guyana"], capitalAliases: ["georgetown"] },
+            { id: "SUR", name: "Suriname", capital: "Paramaribo", region: "Americas", aliases: ["suriname"], capitalAliases: ["paramaribo"] },
+            { id: "ECU", name: "Équateur", capital: "Quito", region: "Americas", aliases: ["equateur"], capitalAliases: ["quito"] },
+            { id: "PER", name: "Pérou", capital: "Lima", region: "Americas", aliases: ["perou"], capitalAliases: ["lima"] },
+            { id: "BRA", name: "Brésil", capital: "Brasilia", region: "Americas", aliases: ["bresil", "brazil"], capitalAliases: ["brasilia"] },
+            { id: "BOL", name: "Bolivie", capital: "Sucre", region: "Americas", aliases: ["bolivie"], capitalAliases: ["sucre", "la paz"] },
+            { id: "PRY", name: "Paraguay", capital: "Asuncion", region: "Americas", aliases: ["paraguay"], capitalAliases: ["asuncion", "asunción"] },
+            { id: "CHL", name: "Chili", capital: "Santiago", region: "Americas", aliases: ["chili", "chile"], capitalAliases: ["santiago"] },
+            { id: "ARG", name: "Argentine", capital: "Buenos Aires", region: "Americas", aliases: ["argentine"], capitalAliases: ["buenos aires"] },
+            { id: "URY", name: "Uruguay", capital: "Montevideo", region: "Americas", aliases: ["uruguay"], capitalAliases: ["montevideo"] },
+
+            // EUROPE (30)
+            { id: "FRA", name: "France", capital: "Paris", region: "Europe", aliases: ["france"], capitalAliases: ["paris"] },
+            { id: "ESP", name: "Espagne", capital: "Madrid", region: "Europe", aliases: ["espagne", "spain"], capitalAliases: ["madrid"] },
+            { id: "GBR", name: "Royaume-Uni", capital: "Londres", region: "Europe", aliases: ["royaume-uni", "royaume uni", "uk", "angleterre"], capitalAliases: ["londres", "london"] },
+            { id: "DEU", name: "Allemagne", capital: "Berlin", region: "Europe", aliases: ["allemagne", "germany"], capitalAliases: ["berlin"] },
+            { id: "ITA", name: "Italie", capital: "Rome", region: "Europe", aliases: ["italie", "italy"], capitalAliases: ["rome", "roma"] },
+            { id: "BEL", name: "Belgique", capital: "Bruxelles", region: "Europe", aliases: ["belgique"], capitalAliases: ["bruxelles", "brussels"] },
+            { id: "NLD", name: "Pays-Bas", capital: "Amsterdam", region: "Europe", aliases: ["pays bas", "pays-bas", "hollande"], capitalAliases: ["amsterdam"] },
+            { id: "CHE", name: "Suisse", capital: "Berne", region: "Europe", aliases: ["suisse"], capitalAliases: ["berne", "bern"] },
+            { id: "AUT", name: "Autriche", capital: "Vienne", region: "Europe", aliases: ["autriche"], capitalAliases: ["vienne", "vienna"] },
+            { id: "POL", name: "Pologne", capital: "Varsovie", region: "Europe", aliases: ["pologne"], capitalAliases: ["varsovie", "warsaw"] },
+            { id: "HUN", name: "Hongrie", capital: "Budapest", region: "Europe", aliases: ["hongrie"], capitalAliases: ["budapest"] },
+            { id: "ROU", name: "Roumanie", capital: "Bucarest", region: "Europe", aliases: ["roumanie"], capitalAliases: ["bucarest", "bucharest"] },
+            { id: "BGR", name: "Bulgarie", capital: "Sofia", region: "Europe", aliases: ["bulgarie"], capitalAliases: ["sofia"] },
+            { id: "GRC", name: "Grèce", capital: "Athènes", region: "Europe", aliases: ["grece"], capitalAliases: ["athenes", "athens"] },
+            { id: "TUR", name: "Turquie", capital: "Ankara", region: "Europe", aliases: ["turquie", "turkiye"], capitalAliases: ["ankara"] },
+            { id: "UKR", name: "Ukraine", capital: "Kiev", region: "Europe", aliases: ["ukraine"], capitalAliases: ["kiev", "kyiv"] },
+            { id: "BLR", name: "Biélorussie", capital: "Minsk", region: "Europe", aliases: ["bielorussie", "belarus"], capitalAliases: ["minsk"] },
+            { id: "MDA", name: "Moldavie", capital: "Chisinau", region: "Europe", aliases: ["moldavie"], capitalAliases: ["chisinau"] },
+            { id: "NOR", name: "Norvège", capital: "Oslo", region: "Europe", aliases: ["norvege"], capitalAliases: ["oslo"] },
+            { id: "SWE", name: "Suède", capital: "Stockholm", region: "Europe", aliases: ["suede"], capitalAliases: ["stockholm"] },
+            { id: "FIN", name: "Finlande", capital: "Helsinki", region: "Europe", aliases: ["finlande"], capitalAliases: ["helsinki"] },
+            { id: "DNK", name: "Danemark", capital: "Copenhague", region: "Europe", aliases: ["danemark"], capitalAliases: ["copenhague", "copenhagen"] },
+            { id: "SVN", name: "Slovénie", capital: "Ljubljana", region: "Europe", aliases: ["slovenie"], capitalAliases: ["ljubljana"] },
+            { id: "HRV", name: "Croatie", capital: "Zagreb", region: "Europe", aliases: ["croatie"], capitalAliases: ["zagreb"] },
+            { id: "BIH", name: "Bosnie-Herzégovine", capital: "Sarajevo", region: "Europe", aliases: ["bosnie"], capitalAliases: ["sarajevo"] },
+            { id: "SRB", name: "Serbie", capital: "Belgrade", region: "Europe", aliases: ["serbie"], capitalAliases: ["belgrade"] },
+            { id: "MNE", name: "Monténégro", capital: "Podgorica", region: "Europe", aliases: ["montenegro"], capitalAliases: ["podgorica"] },
+            { id: "ALB", name: "Albanie", capital: "Tirana", region: "Europe", aliases: ["albanie"], capitalAliases: ["tirana"] },
+            { id: "XKX", name: "Kosovo", capital: "Pristina", region: "Europe", aliases: ["kosovo"], capitalAliases: ["pristina"] },
+            { id: "RUS", name: "Russie", capital: "Moscou", region: "Europe", aliases: ["russie", "russia"], capitalAliases: ["moscou", "moscow"] },
+
+            // ASIE & MOYEN-ORIENT (26)
+            { id: "CHN", name: "Chine", capital: "Pékin", region: "Asia", aliases: ["chine", "china"], capitalAliases: ["pekin", "beijing"] },
+            { id: "IND", name: "Inde", capital: "New Delhi", region: "Asia", aliases: ["inde", "india"], capitalAliases: ["new delhi", "delhi"] },
+            { id: "JPN", name: "Japon", capital: "Tokyo", region: "Asia", aliases: ["japon", "japan"], capitalAliases: ["tokyo"] },
+            { id: "KOR", name: "Corée du Sud", capital: "Séoul", region: "Asia", aliases: ["coree du sud", "coree sud"], capitalAliases: ["seoul", "séoul"] },
+            { id: "PRK", name: "Corée du Nord", capital: "Pyongyang", region: "Asia", aliases: ["coree du nord", "coree nord"], capitalAliases: ["pyongyang"] },
+            { id: "PAK", name: "Pakistan", capital: "Islamabad", region: "Asia", aliases: ["pakistan"], capitalAliases: ["islamabad"] },
+            { id: "AFG", name: "Afghanistan", capital: "Kaboul", region: "Asia", aliases: ["afghanistan"], capitalAliases: ["kaboul", "kabul"] },
+            { id: "BGD", name: "Bangladesh", capital: "Dacca", region: "Asia", aliases: ["bangladesh"], capitalAliases: ["dacca", "dhaka"] },
+            { id: "MMR", name: "Myanmar", capital: "Naypyidaw", region: "Asia", aliases: ["myanmar", "birmanie"], capitalAliases: ["naypyidaw"] },
+            { id: "THA", name: "Thaïlande", capital: "Bangkok", region: "Asia", aliases: ["thailande"], capitalAliases: ["bangkok"] },
+            { id: "LAO", name: "Laos", capital: "Vientiane", region: "Asia", aliases: ["laos"], capitalAliases: ["vientiane"] },
+            { id: "KHM", name: "Cambodge", capital: "Phnom Penh", region: "Asia", aliases: ["cambodge"], capitalAliases: ["phnom penh"] },
+            { id: "VNM", name: "Vietnam", capital: "Hanoï", region: "Asia", aliases: ["vietnam"], capitalAliases: ["hanoi", "hanoï"] },
+            { id: "IDN", name: "Indonésie", capital: "Jakarta", region: "Asia", aliases: ["indonesie"], capitalAliases: ["jakarta"] },
+            { id: "PHL", name: "Philippines", capital: "Manille", region: "Asia", aliases: ["philippines"], capitalAliases: ["manille", "manila"] },
+            { id: "TLS", name: "Timor-Leste", capital: "Dili", region: "Asia", aliases: ["timor leste"], capitalAliases: ["dili"] },
+            { id: "IRN", name: "Iran", capital: "Téhéran", region: "Asia", aliases: ["iran"], capitalAliases: ["teheran", "téhéran"] },
+            { id: "IRQ", name: "Irak", capital: "Bagdad", region: "Asia", aliases: ["irak", "iraq"], capitalAliases: ["bagdad", "baghdad"] },
+            { id: "SYR", name: "Syrie", capital: "Damas", region: "Asia", aliases: ["syrie"], capitalAliases: ["damas", "damascus"] },
+            { id: "LBN", name: "Liban", capital: "Beyrouth", region: "Asia", aliases: ["liban"], capitalAliases: ["beyrouth", "beirut"] },
+            { id: "ISR", name: "Israël", capital: "Jérusalem", region: "Asia", aliases: ["israel"], capitalAliases: ["jerusalem", "jérusalem"] },
+            { id: "SAU", name: "Arabie Saoudite", capital: "Riyad", region: "Asia", aliases: ["arabie saoudite"], capitalAliases: ["riyad", "riyadh"] },
+            { id: "YEM", name: "Yémen", capital: "Sanaa", region: "Asia", aliases: ["yemen"], capitalAliases: ["sanaa", "sana'a"] },
+            { id: "ARM", name: "Arménie", capital: "Erevan", region: "Asia", aliases: ["armenie"], capitalAliases: ["erevan", "yerevan"] },
+            { id: "AZE", name: "Azerbaïdjan", capital: "Brakou", region: "Asia", aliases: ["azerbaidjan"], capitalAliases: ["bakou", "baku"] },
+
+            // AFRIQUE (20)
+            { id: "MAR", name: "Maroc", capital: "Rabat", region: "Africa", aliases: ["maroc"], capitalAliases: ["rabat"] },
+            { id: "DZA", name: "Algérie", capital: "Alger", region: "Africa", aliases: ["algerie"], capitalAliases: ["alger", "algiers"] },
+            { id: "TUN", name: "Tunisie", capital: "Tunis", region: "Africa", aliases: ["tunisie"], capitalAliases: ["tunis"] },
+            { id: "LBY", name: "Libye", capital: "Tripoli", region: "Africa", aliases: ["libye"], capitalAliases: ["tripoli"] },
+            { id: "EGY", name: "Égypte", capital: "Le Caire", region: "Africa", aliases: ["egypte"], capitalAliases: ["le caire", "caire", "cairo"] },
+            { id: "SDN", name: "Soudan", capital: "Khartoum", region: "Africa", aliases: ["soudan"], capitalAliases: ["khartoum"] },
+            { id: "SSD", name: "Sud Soudan", capital: "Juba", region: "Africa", aliases: ["sud soudan"], capitalAliases: ["juba"] },
+            { id: "ETH", name: "Éthiopie", capital: "Addis-Abeba", region: "Africa", aliases: ["ethiopie"], capitalAliases: ["addis abeba", "addis-abeba"] },
+            { id: "SOM", name: "Somalie", capital: "Mogadiscio", region: "Africa", aliases: ["somalie"], capitalAliases: ["mogadiscio", "mogadishu"] },
+            { id: "UGA", name: "Ouganda", capital: "Kampala", region: "Africa", aliases: ["ouganda"], capitalAliases: ["kampala"] },
+            { id: "RWA", name: "Rwanda", capital: "Kigali", region: "Africa", aliases: ["rwanda"], capitalAliases: ["kigali"] },
+            { id: "COD", name: "République démocratique du Congo", capital: "Kinshasa", region: "Africa", aliases: ["congo", "rdc"], capitalAliases: ["kinshasa"] },
+            { id: "CAF", name: "République centrafricaine", capital: "Bangui", region: "Africa", aliases: ["centrafrique"], capitalAliases: ["bangui"] },
+            { id: "TCD", name: "Tchad", capital: "N'Djaména", region: "Africa", aliases: ["tchad"], capitalAliases: ["ndjamena", "n'djamena"] },
+            { id: "MLI", name: "Mali", capital: "Bamako", region: "Africa", aliases: ["mali"], capitalAliases: ["bamako"] },
+            { id: "SEN", name: "Sénégal", capital: "Dakar", region: "Africa", aliases: ["senegal"], capitalAliases: ["dakar"] },
+            { id: "NGA", name: "Nigéria", capital: "Abuja", region: "Africa", aliases: ["nigeria"], capitalAliases: ["abuja"] },
+            { id: "BWA", name: "Botswana", capital: "Gaborone", region: "Africa", aliases: ["botswana"], capitalAliases: ["gaborone"] },
+            { id: "ZWE", name: "Zimbabwe", capital: "Harare", region: "Africa", aliases: ["zimbabwe"], capitalAliases: ["harare"] },
+            { id: "MDG", name: "Madagascar", capital: "Antananarivo", region: "Africa", aliases: ["madagascar"], capitalAliases: ["antananarivo", "tana"] }
+        ];
+
+        let map;
+        let highlightedLayer = null;
+        let worldGeoData = null;
+        
+        let currentChallengeType = "COUNTRY"; // "COUNTRY" or "CAPITAL"
+        let activePool = [];
+        let currentTarget = null;
+        let activeCustomChallengeData = null;
+        
+        let score = 0;
+        let streak = 0;
+        let totalAnswered = 0;
+        let autoZoom = true;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            initMap();
+            populateChecklist();
+            checkUrlForSharedChallenge();
+        });
+
+        function initMap() {
+            map = L.map('map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 7, zoomControl: false });
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap, CartoDB',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson')
+                .then(res => res.json())
+                .then(data => {
+                    worldGeoData = data;
+                    if (!activeCustomChallengeData) {
+                        loadPresetChallenge();
+                    }
+                })
+                .catch(err => console.error("Erreur GeoJSON", err));
+        }
+
+        function loadPresetChallenge() {
+            const val = document.getElementById('preset-select').value;
+            activeCustomChallengeData = null;
+            document.getElementById('custom-challenge-banner').classList.add('hidden');
+
+            let pool = [];
+            if (val === 'ALL_COUNTRIES') {
+                currentChallengeType = 'COUNTRY';
+                pool = [...countriesList];
+            } else if (val === 'ALL_CAPITALS') {
+                currentChallengeType = 'CAPITAL';
+                pool = [...countriesList];
+            } else {
+                const [region, type] = val.split('_');
+                currentChallengeType = type === 'CAPITALS' ? 'CAPITAL' : 'COUNTRY';
+                const regMap = { 'AMERICAS': 'Americas', 'EUROPE': 'Europe', 'ASIA': 'Asia', 'AFRICA': 'Africa' };
+                pool = countriesList.filter(c => c.region === regMap[region]);
+            }
+
+            updateUIForMode();
+            startNewSession(pool);
+        }
+
+        function updateUIForMode() {
+            const badge = document.getElementById('mode-badge');
+            const prompt = document.getElementById('target-prompt');
+            const input = document.getElementById('type-input');
+
+            if (currentChallengeType === 'CAPITAL') {
+                badge.innerText = "Mode Capitales";
+                prompt.innerHTML = `<i data-lucide="building-2" class="w-4 h-4 text-amber-400"></i> Tape la capitale du pays surligné`;
+                input.placeholder = "Tape le nom de la capitale...";
+            } else {
+                badge.innerText = "Mode Pays";
+                prompt.innerHTML = `<i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i> Tape le nom du pays surligné`;
+                input.placeholder = "Tape le nom du pays...";
+            }
+            lucide.createIcons();
+        }
+
+        function startNewSession(pool) {
+            score = 0;
+            streak = 0;
+            totalAnswered = 0;
+            activePool = [...pool];
+            shuffleArray(activePool);
+            updateDashboard();
+            renderCountryList();
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            document.getElementById('feedback-banner').classList.add('hidden');
+            const inputField = document.getElementById('type-input');
+            inputField.value = '';
+            inputField.focus();
+
+            if (activePool.length === 0) {
+                showFeedback("🎉 Session terminée ! Bravo.", "bg-indigo-600 text-white", false);
+                return;
+            }
+
+            currentTarget = activePool.pop();
+            highlightTargetOnMap(currentTarget);
+        }
+
+        function highlightTargetOnMap(country) {
+            if (!worldGeoData) return;
+            if (highlightedLayer) map.removeLayer(highlightedLayer);
+
+            const feature = worldGeoData.features.find(f => {
+                const iso3 = f.properties.ADM0_A3 || f.properties.ISO_A3;
+                return iso3 === country.id || f.properties.NAME_FR?.toLowerCase() === country.name.toLowerCase();
+            });
+
+            if (feature) {
+                highlightedLayer = L.geoJSON(feature, { style: { className: 'highlighted-country' } }).addTo(map);
+
+                if (autoZoom) {
+                    map.fitBounds(highlightedLayer.getBounds(), { padding: [50, 50], maxZoom: 5, animate: true, duration: 0.8 });
+                }
+            }
+        }
+
+        function toggleAutoZoom() {
+            autoZoom = !autoZoom;
+            document.getElementById('zoom-toggle-text').innerText = `Zoom Auto : ${autoZoom ? 'OUI' : 'NON'}`;
+            if (autoZoom && currentTarget) highlightTargetOnMap(currentTarget);
+        }
+
+        function resetMapView() { map.setView([20, 0], 2); }
+
+        function normalizeString(str) {
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        }
+
+        function handleTypeSubmit(e) {
+            e.preventDefault();
+            const inputVal = normalizeString(document.getElementById('type-input').value);
+            if (!inputVal || !currentTarget) return;
+
+            let isCorrect = false;
+            if (currentChallengeType === 'CAPITAL') {
+                isCorrect = currentTarget.capitalAliases.some(a => normalizeString(a) === inputVal) || normalizeString(currentTarget.capital) === inputVal;
+            } else {
+                isCorrect = currentTarget.aliases.some(a => normalizeString(a) === inputVal) || normalizeString(currentTarget.name) === inputVal;
+            }
+
+            if (isCorrect) handleSuccess();
+            else handleFailure("Mauvaise réponse, réessaye !");
+        }
+
+        function selectCountryFromList(countryId) {
+            if (!currentTarget) return;
+            if (countryId === currentTarget.id) handleSuccess();
+            else handleFailure("Ce n'est pas ce pays !");
+        }
+
+        function handleSuccess() {
+            score++; streak++; totalAnswered++;
+            updateDashboard();
+            markListButton(currentTarget.id, 'correct');
+            const targetText = currentChallengeType === 'CAPITAL' ? `${currentTarget.capital} (${currentTarget.name})` : currentTarget.name;
+            showFeedback(` Bravo ! C'est bien ${targetText}`, "bg-emerald-950/90 text-emerald-200 border border-emerald-500/50", true);
+        }
+
+        function handleFailure(msg) {
+            streak = 0;
+            updateDashboard();
+            showFeedback(` ${msg}`, "bg-amber-950/90 text-amber-200 border border-amber-500/50", false);
+        }
+
+        function revealAnswer() {
+            if (!currentTarget) return;
+            streak = 0; totalAnswered++;
+            updateDashboard();
+            const ansText = currentChallengeType === 'CAPITAL' ? `${currentTarget.capital} (Pays: ${currentTarget.name})` : currentTarget.name;
+            showFeedback(` C'était : ${ansText}`, "bg-rose-950/90 text-rose-200 border border-rose-500/50", true);
+            markListButton(currentTarget.id, 'revealed');
+        }
+
+        function skipQuestion() { nextQuestion(); }
+
+        function showFeedback(text, bgClass, showNext) {
+            const banner = document.getElementById('feedback-banner');
+            const textEl = document.getElementById('feedback-text');
+            const nextBtn = document.getElementById('next-btn');
+
+            banner.className = `shrink-0 mx-4 mt-3 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-lg ${bgClass}`;
+            textEl.innerText = text;
+            banner.classList.remove('hidden');
+
+            if (showNext) nextBtn.classList.remove('hidden');
+            else nextBtn.classList.add('hidden');
+        }
+
+        function updateDashboard() {
+            document.getElementById('stat-score').innerText = score;
+            document.getElementById('stat-streak').innerText = `${streak} 🔥`;
+            const total = activeCustomChallengeData ? activeCustomChallengeData.countryIds.length : activePool.length + totalAnswered;
+            document.getElementById('stat-progress').innerText = `${totalAnswered} / ${total || 100}`;
+        }
+
+        function renderCountryList() {
+            const listEl = document.getElementById('country-list');
+            const source = activeCustomChallengeData ? 
+                countriesList.filter(c => activeCustomChallengeData.countryIds.includes(c.id)) : 
+                activePool;
+
+            const sorted = [...source].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+            document.getElementById('country-count').innerText = `${sorted.length} éléments`;
+
+            listEl.innerHTML = '';
+            sorted.forEach(c => {
+                const btn = document.createElement('button');
+                btn.id = `btn-country-${c.id}`;
+                btn.className = "w-full text-left bg-slate-950 hover:bg-slate-800 text-slate-300 font-medium px-3 py-2 rounded-xl border border-slate-800 hover:border-slate-700 text-xs transition flex items-center justify-between group active:scale-98";
+                btn.onclick = () => selectCountryFromList(c.id);
+
+                const label = currentChallengeType === 'CAPITAL' ? `${c.capital} <span class="text-slate-500 text-[10px]">(${c.name})</span>` : c.name;
+                btn.innerHTML = `<span class="truncate">${label}</span><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-amber-400 transition"></i>`;
+                listEl.appendChild(btn);
+            });
+            lucide.createIcons();
+        }
+
+        function markListButton(id, state) {
+            const btn = document.getElementById(`btn-country-${id}`);
+            if (!btn) return;
+            if (state === 'correct') btn.className = "w-full text-left bg-emerald-950 text-emerald-200 font-bold px-3 py-2 rounded-xl border border-emerald-500 text-xs flex items-center justify-between";
+            else if (state === 'revealed') btn.className = "w-full text-left bg-rose-950 text-rose-200 font-bold px-3 py-2 rounded-xl border border-rose-500 text-xs flex items-center justify-between";
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function populateChecklist() {
+            const container = document.getElementById('country-checklist');
+            container.innerHTML = '';
+            const sorted = [...countriesList].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
+            sorted.forEach(c => {
+                const label = document.createElement('label');
+                label.className = "flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer select-none text-[11px]";
+                label.innerHTML = `<input type="checkbox" value="${c.id}" onchange="updateSelectedCount()" class="chk-country rounded accent-amber-500 bg-slate-900 border-slate-700"> <span class="truncate">${c.name}</span>`;
+                container.appendChild(label);
+            });
+        }
+
+        function selectAllCountries(status) {
+            document.querySelectorAll('.chk-country').forEach(cb => cb.checked = status);
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.chk-country:checked').length;
+            document.getElementById('selected-count').innerText = count;
+        }
+
+        function openCustomChallengeModal() {
+            document.getElementById('custom-modal').classList.remove('hidden');
+        }
+
+        function closeCustomChallengeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+
+        async function saveAndGenerateChallenge() {
+            const title = document.getElementById('custom-title').value.trim();
+            const type = document.getElementById('custom-type').value;
+            const desc = document.getElementById('custom-desc').value.trim();
+
+            const checkedNodes = document.querySelectorAll('.chk-country:checked');
+            const countryIds = Array.from(checkedNodes).map(cb => cb.value);
+
+            if (!title) {
+                alert("Veuillez donner un titre à votre challenge.");
+                return;
+            }
+            if (countryIds.length < 2) {
+                alert("Veuillez sélectionner au moins 2 pays.");
+                return;
+            }
+
+            const challengeObj = {
+                id: 'c_' + Math.random().toString(36).substr(2, 9),
+                title: title,
+                type: type,
+                desc: desc,
+                countryIds: countryIds,
+                createdAt: Date.now()
+            };
+
+            // Attempt saving to Vercel KV if credentials exist
+            const kvUrl = localStorage.getItem('VERCEL_KV_REST_API_URL');
+            const kvToken = localStorage.getItem('VERCEL_KV_REST_API_TOKEN');
+
+            let shareUrl = "";
+
+            if (kvUrl && kvToken) {
+                try {
+                    await fetch(`${kvUrl}/set/${challengeObj.id}`, {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${kvToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(challengeObj)
+                    });
+                    shareUrl = `${window.location.origin}${window.location.pathname}?cId=${challengeObj.id}`;
+                } catch (err) {
+                    console.warn("Erreur Vercel DB, passage au fallback URL compressée", err);
+                }
+            }
+
+            if (!shareUrl) {
+                // Fallback compressed direct URL encoding for instant 100% universal sharing
+                const jsonStr = JSON.stringify(challengeObj);
+                const encoded = btoa(encodeURIComponent(jsonStr));
+                shareUrl = `${window.location.origin}${window.location.pathname}?c=${encoded}`;
+            }
+
+            // Copy link to clipboard
+            copyTextToClipboard(shareUrl);
+            alert(`🎉 Challenge "${title}" sauvegardé !\n\nLien de partage copié dans le presse-papier :\n${shareUrl}`);
+
+            closeCustomChallengeModal();
+            activateCustomChallenge(challengeObj);
+        }
+
+        function activateCustomChallenge(data) {
+            activeCustomChallengeData = data;
+            currentChallengeType = data.type;
+
+            document.getElementById('custom-banner-title').innerText = data.title;
+            document.getElementById('custom-banner-desc').innerText = data.desc ? `— ${data.desc}` : '';
+            document.getElementById('custom-challenge-banner').classList.remove('hidden');
+
+            updateUIForMode();
+
+            const pool = countriesList.filter(c => data.countryIds.includes(c.id));
+            startNewSession(pool);
+        }
+
+        function resetToDefaultChallenge() {
+            activeCustomChallengeData = null;
+            document.getElementById('custom-challenge-banner').classList.add('hidden');
+            window.history.replaceState({}, document.title, window.location.pathname);
+            loadPresetChallenge();
+        }
+
+        async function checkUrlForSharedChallenge() {
+            const params = new URLSearchParams(window.location.search);
+            const cDataParam = params.get('c');
+            const cIdParam = params.get('cId');
+
+            if (cDataParam) {
+                try {
+                    const decodedStr = decodeURIComponent(atob(cDataParam));
+                    const challengeObj = JSON.parse(decodedStr);
+                    activateCustomChallenge(challengeObj);
+                    return;
+                } catch (e) {
+                    console.error("Lien invalide", e);
+                }
+            } else if (cIdParam) {
+                const kvUrl = localStorage.getItem('VERCEL_KV_REST_API_URL');
+                const kvToken = localStorage.getItem('VERCEL_KV_REST_API_TOKEN');
+
+                if (kvUrl && kvToken) {
+                    try {
+                        const res = await fetch(`${kvUrl}/get/${cIdParam}`, {
+                            headers: { Authorization: `Bearer ${kvToken}` }
+                        });
+                        const json = await res.json();
+                        if (json.result) {
+                            const challengeObj = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
+                            activateCustomChallenge(challengeObj);
+                            return;
+                        }
+                    } catch (e) {
+                        console.error("Erreur de récupération Vercel DB", e);
+                    }
+                }
+            }
+        }
+
+        function copyCurrentChallengeShareLink() {
+            if (!activeCustomChallengeData) return;
+            const jsonStr = JSON.stringify(activeCustomChallengeData);
+            const encoded = btoa(encodeURIComponent(jsonStr));
+            const shareUrl = `${window.location.origin}${window.location.pathname}?c=${encoded}`;
+            copyTextToClipboard(shareUrl);
+            alert("Lien du challenge copié !");
+        }
+
+        function copyTextToClipboard(text) {
+            const tempInput = document.createElement("textarea");
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+        }
+
+        function openVercelConfigModal() {
+            document.getElementById('kv-url').value = localStorage.getItem('VERCEL_KV_REST_API_URL') || '';
+            document.getElementById('kv-token').value = localStorage.getItem('VERCEL_KV_REST_API_TOKEN') || '';
+            document.getElementById('vercel-modal').classList.remove('hidden');
+        }
+
+        function closeVercelConfigModal() {
+            document.getElementById('vercel-modal').classList.add('hidden');
+        }
+
+        function saveVercelKeys() {
+            const url = document.getElementById('kv-url').value.trim();
+            const token = document.getElementById('kv-token').value.trim();
+
+            if (url) localStorage.setItem('VERCEL_KV_REST_API_URL', url);
+            else localStorage.removeItem('VERCEL_KV_REST_API_URL');
+
+            if (token) localStorage.setItem('VERCEL_KV_REST_API_TOKEN', token);
+            else localStorage.removeItem('VERCEL_KV_REST_API_TOKEN');
+
+            alert("Clés Vercel sauvegardées !");
+            closeVercelConfigModal();
+        }
+    </script>
+</body>
+</html>
