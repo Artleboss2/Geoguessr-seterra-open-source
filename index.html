@@ -331,6 +331,12 @@
                 </div>
 
                 <div id="country-list" class="grid grid-cols-2 gap-1.5"></div>
+                <nav aria-label="Informations légales" class="mt-4 pt-3 border-t border-slate-800 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                    <a href="mentions-legales.html" class="hover:text-amber-400 underline">Mentions légales</a>
+                    <a href="confidentialite.html" class="hover:text-amber-400 underline">Confidentialité</a>
+                    <a href="cgu.html" class="hover:text-amber-400 underline">Conditions</a>
+                    <a href="contact.html" class="hover:text-amber-400 underline">Contact</a>
+                </nav>
             </div>
         </div>
     </main>
@@ -424,6 +430,7 @@
                 </div>
             </div>
 
+            <p class="px-4 sm:px-6 py-2 text-[11px] text-slate-400 border-t border-slate-800 shrink-0">En sauvegardant, le titre, la description et ton nom (facultatif) seront enregistrés et visibles par tous. N'y mets pas de renseignements personnels. <a href="confidentialite.html" class="underline hover:text-amber-400">Confidentialité</a> · <a href="cgu.html" class="underline hover:text-amber-400">Conditions</a></p>
             <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex flex-wrap justify-end gap-2 sm:gap-3 shrink-0">
                 <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 font-semibold transition">
                     Annuler
@@ -466,6 +473,12 @@
                     <p class="text-[10px] text-slate-500 mt-1">La clé de Vercel (<code class="text-emerald-400">CARTO_API_KEY</code>) est prioritaire et n'est jamais envoyée au navigateur. Les fonds de carte CartoDB fonctionnent aussi sans clé.</p>
                 </div>
 
+                <p class="text-[11px] text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
+                    <a href="mentions-legales.html" class="underline hover:text-amber-400">Mentions légales</a>
+                    <a href="confidentialite.html" class="underline hover:text-amber-400">Confidentialité</a>
+                    <a href="cgu.html" class="underline hover:text-amber-400">Conditions</a>
+                    <a href="contact.html" class="underline hover:text-amber-400">Contact</a>
+                </p>
                 <p class="text-[11px] text-slate-400 leading-relaxed">
                     Les identifiants de la base de données (<code class="text-emerald-400">KV_REST_API_URL</code> et <code class="text-emerald-400">KV_REST_API_TOKEN</code>) se configurent uniquement dans Vercel, jamais dans le navigateur.
                 </p>
