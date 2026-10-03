@@ -2,6 +2,9 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <script>window.addEventListener("error",function(e){if(!e||!e.message)return;var d=document.createElement("div");d.id="gm-error-bar";
+        d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7f1d1d;color:#fff;font:12px/1.4 monospace;padding:8px 12px;word-break:break-word";
+        d.textContent="Erreur JavaScript : "+e.message+(e.lineno?" (ligne "+e.lineno+")":"");document.documentElement.appendChild(d);});</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0f172a">
     <meta name="mobile-web-app-capable" content="yes">
@@ -690,6 +693,10 @@
         const challengeType = () => (currentChallenge && currentChallenge.type) || "COUNTRY";
 
         // ======================= UTILITAIRES =======================
+        function refreshIcons() {
+            try { if (window.lucide) window.lucide.createIcons(); } catch (e) { console.warn("Icônes indisponibles", e); }
+        }
+
         function normalizeString(str) {
             return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
         }
@@ -785,12 +792,17 @@
         document.addEventListener("DOMContentLoaded", async () => {
             buildPresetSelect();
             populateChecklist();
-            lucide.createIcons();
+            refreshIcons();
             { const a = getAppearance(); applyAppearance(a.theme, a.hc, false); }
 
             await fetchServerConfig();
-            initMap();
-            setupResponsiveBehavior();
+            try {
+                initMap();
+                setupResponsiveBehavior();
+            } catch (e) {
+                console.error("Carte indisponible", e);
+                showToast("La carte n'a pas pu se charger (Leaflet bloqué ou hors ligne ?).", 6000);
+            }
 
             const started = await checkUrlForSharedChallenge();
             if (!started) startChallenge(PRESETS[0]);
@@ -945,7 +957,7 @@
                 prompt.innerHTML = `<i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i> Tape le nom du pays surligné`;
                 input.placeholder = "Tape le nom du pays...";
             }
-            lucide.createIcons();
+            refreshIcons();
         }
 
         function startNewSession(pool) {
@@ -1020,7 +1032,6 @@
             highlightedLayer = L.geoJSON(feature, { style: { className: "highlighted-country" } }).addTo(map);
 
             if (autoZoom) moveToBounds(highlightedLayer.getBounds());
-        }
         }
 
         // Transition entre deux pays : dézoom, déplacement, puis rezoom sur la cible
@@ -1234,7 +1245,7 @@
                 btn.insertAdjacentHTML("beforeend", `<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-amber-400 transition"></i>`);
                 listEl.appendChild(btn);
             });
-            lucide.createIcons();
+            refreshIcons();
         }
 
         function markListButton(id, state) {
@@ -1261,7 +1272,7 @@
 
         function openLibrary() {
             document.getElementById("library-modal").classList.remove("hidden");
-            lucide.createIcons();
+            refreshIcons();
             const input = document.getElementById("lib-search");
             input.focus();
             input.select();
@@ -1359,7 +1370,7 @@
 
             if (dbItems.length > 0) container.appendChild(buildLibrarySection("Créés par la communauté", dbItems, 0));
             if (presets.length > 0) container.appendChild(buildLibrarySection("Challenges officiels", presets, dbItems.length));
-            lucide.createIcons();
+            refreshIcons();
         }
 
         function buildLibrarySection(title, items, offset) {
