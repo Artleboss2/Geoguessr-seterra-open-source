@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
   if (!key) return res.status(503).send('CARTO_API_KEY manquante');
 
   // CARTO exige désormais une clé : chemin /rastertiles/ et paramètre ?key=
-  const url = `https://a.basemaps.cartocdn.com/rastertiles/dark_all/${z}/${x}/${y}${retina}.png?key=${encodeURIComponent(key)}`;
+  const url = `https://a.basemaps.cartocdn.com/rastertiles/dark_nolabels/${z}/${x}/${y}${retina}.png?key=${encodeURIComponent(key)}`;
 
   // Si la clé est limitée à certains sites dans le tableau de bord CARTO,
   // CARTO vérifie l'en-tête Referer : on envoie celui de ton site.
