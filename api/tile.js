@@ -17,8 +17,9 @@ module.exports = async (req, res) => {
   const key = (process.env.CARTO_API_KEY || '').trim().replace(/^["']|["']$/g, '');
   if (!key) return res.status(503).send('CARTO_API_KEY manquante');
 
-  // CARTO exige désormais une clé : chemin /rastertiles/ et paramètre ?key=
-  const url = `https://a.basemaps.cartocdn.com/rastertiles/dark_nolabels/${z}/${x}/${y}${retina}.png?key=${encodeURIComponent(key)}`;
+  // Style sombre SANS noms (dark_nolabels), avec la clé en paramètre ?key=
+  const path = `dark_nolabels/${z}/${x}/${y}${retina}.png`;
+  const url = `https://a.basemaps.cartocdn.com/${path}?key=${encodeURIComponent(key)}`;
 
   // Si la clé est limitée à certains sites dans le tableau de bord CARTO,
   // CARTO vérifie l'en-tête Referer : on envoie celui de ton site.
@@ -35,6 +36,7 @@ module.exports = async (req, res) => {
         content_type: upstream.headers.get('content-type'),
         bytes: buffer.length,
         key_length: key.length,
+        tile_path: path,
         referer_sent: referer
       });
     }
