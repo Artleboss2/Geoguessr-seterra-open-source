@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>GeoMaster - Challenges & Cartes Personnalisées</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        #map { background-color: #0b0f19; z-index: 1; }
+
+        .highlighted-country {
+            fill: #f59e0b !important;
+            fill-opacity: 0.75 !important;
+            stroke: #fef08a !important;
+            stroke-width: 2.5px !important;
+            filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.9));
+            animation: pulse-glow 1.6s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            from { fill-opacity: 0.55; stroke-width: 2px; filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6)); }
+            to   { fill-opacity: 0.90; stroke-width: 3.5px; filter: drop-shadow(0 0 14px rgba(245, 158, 11, 1)); }
+        }
+
+        .leaflet-container { font-family: inherit; }
+        .osm-dark-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9); }
+
+        @media (prefers-reduced-motion: reduce) {
+            .highlighted-country { animation: none; }
+        }
+
+        /* ======================= RESPONSIVE (téléphone / iPad) ======================= */
+        html, body { height: 100%; overscroll-behavior: none; }
+        body {
+            height: 100vh; height: 100dvh;
+            -webkit-tap-highlight-color: transparent;
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        #app-header { padding-top: max(0.5rem, env(safe-area-inset-top)); }
+
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        button, select, label { touch-action: manipulation; }
+
+        .no-scrollbar { scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        #workspace { display: flex; flex-direction: column; }
+        #map-panel { position: relative; flex: 0 0 40%; min-height: 180px; border-bottom: 1px solid #1e293b; }
+        #side-panel { flex: 1 1 0; min-height: 0; }
+
+        @media (min-width: 768px) and (orientation: portrait) {
+            #map-panel { flex-basis: 48%; }
+        }
+        @media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
+            #workspace { flex-direction: row; }
+            #map-panel { flex: 0 0 58%; min-height: 0; border-bottom: 0; border-right: 1px solid #1e293b; }
+        }
+        @media (min-width: 1280px) {
+            #map-panel { flex-basis: 66.6667%; }
+        }
+
+        @media (max-height: 500px) and (orientation: landscape) {
+            .hide-on-short { display: none !important; }
+        }
+
+        @media (pointer: coarse) {
+            button, select { min-height: 40px; }
+            .leaflet-touch .leaflet-bar a { width: 38px; height: 38px; line-height: 38px; }
+            #country-checklist label { font-size: 13px; padding: 6px 0; }
+            .chk-country { width: 20px; height: 20px; }
+        }
+
+        @media (max-width: 1023px) {
+            input, select, textarea { font-size: 16px !important; }
+        }
+
+        body.kb-open #app-header,
+        body.kb-open #custom-challenge-banner { display: none !important; }
+        @media (orientation: portrait) {
+            body.kb-open #map-panel { flex-basis: 30%; min-height: 110px; }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden select-none">
+
+    <!-- Top Header Navigation -->
+    <header id="app-header" class="bg-slate-900 border-b border-slate-800 px-3 sm:px-4 pb-2 shrink-0 shadow-xl z-20">
+        <div class="max-w-7xl mx-auto flex flex-wrap lg:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
+
+            <div class="flex items-center gap-2.5 min-w-0 order-1">
+                <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-slate-950 shadow-lg shadow-amber-500/20 shrink-0">
+                    <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="font-black text-base sm:text-lg tracking-tight text-white flex items-center gap-2">
+                        GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30 whitespace-nowrap">Mode Pays</span>
+                    </h1>
+                    <p id="mode-subtitle" class="hidden sm:block hide-on-short text-xs text-slate-400 truncate">Trouve le pays ou la capitale du pays surligné (4 essais)</p>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="order-2 lg:order-3 flex items-center gap-2.5 sm:gap-6 bg-slate-950/80 px-3 sm:px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Score</span>
+                    <span id="stat-score" class="font-extrabold text-sm sm:text-base text-emerald-400">0%</span>
+                </div>
+                <div class="w-px h-5 bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Série</span>
+                    <span id="stat-streak" class="font-extrabold text-sm sm:text-base text-amber-400">0 🔥</span>
+                </div>
+                <div class="w-px h-5 bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progression</span>
+                    <span id="stat-progress" class="font-extrabold text-sm sm:text-base text-indigo-400 whitespace-nowrap">0 / 0</span>
+                </div>
+            </div>
+
+            <!-- Challenge selector & buttons -->
+            <div id="header-actions" class="order-3 lg:order-2 w-full lg:w-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <button onclick="openLibrary()" class="shrink-0 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="search" class="w-4 h-4"></i> Rechercher<span class="hidden sm:inline">&nbsp;un challenge</span>
+                </button>
+
+                <select id="preset-select" onchange="onPresetChange()" class="shrink-0 bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[200px] sm:max-w-[220px]">
+                </select>
+
+                <button onclick="openCustomChallengeModal()" class="shrink-0 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer<span class="hidden sm:inline">&nbsp;un challenge</span>
+                </button>
+
+                <button onclick="openConfigModal()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration" aria-label="Configuration">
+                    <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> <span class="hidden sm:inline">Config</span>
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Custom Challenge Active Banner -->
+    <div id="custom-challenge-banner" class="hidden bg-indigo-950/90 border-b border-indigo-500/40 px-3 sm:px-4 py-1.5 sm:py-2 text-xs flex items-center justify-between gap-2 z-10 shrink-0">
+        <div class="flex items-center gap-2 text-indigo-200 font-medium min-w-0">
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400 shrink-0"></i>
+            <span class="truncate">Challenge : <strong id="custom-banner-title" class="text-white">--</strong></span>
+            <span id="custom-banner-desc" class="text-indigo-300/80 text-[11px] hidden md:inline truncate"></span>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <button onclick="copyCurrentChallengeShareLink()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition">
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Copier<span class="hidden sm:inline">&nbsp;le lien</span>
+            </button>
+            <button onclick="resetToDefaultChallenge()" class="text-indigo-300 hover:text-white text-xs underline">
+                Quitter
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <main id="workspace" class="flex-1 min-h-0 overflow-hidden relative">
+
+        <!-- Map Panel -->
+        <div id="map-panel">
+            <div id="map" class="w-full h-full"></div>
+
+            <div class="absolute top-2.5 left-2.5 sm:top-4 sm:left-4 z-[1000] bg-slate-900/90 border border-slate-700/80 backdrop-blur-md px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-semibold text-amber-300 flex items-center gap-2 shadow-xl">
+                <span class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                </span>
+                <span id="target-map-label">Cible surlignée sur la carte</span>
+            </div>
+
+            <div class="absolute bottom-6 left-2.5 sm:bottom-4 sm:left-4 z-[1000] flex flex-wrap gap-1.5 sm:gap-2">
+                <button onclick="resetMapView()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-[11px] sm:text-xs font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+                    <i data-lucide="globe" class="w-4 h-4 text-slate-400"></i> Vue globale
+                </button>
+                <button id="btn-auto-zoom" onclick="toggleAutoZoom()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-[11px] sm:text-xs font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+                    <i data-lucide="zoom-in" class="w-4 h-4 text-amber-400"></i> <span id="zoom-toggle-text">Zoom auto : OUI</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar Panel -->
+        <div id="side-panel" class="bg-slate-900/95 flex flex-col overflow-hidden">
+
+            <div class="p-3 sm:p-4 border-b border-slate-800 space-y-2.5 sm:space-y-3 shrink-0 bg-slate-900">
+                <div class="flex items-center justify-between">
+                    <span id="target-prompt" class="text-xs font-bold uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="help-circle" class="w-4 h-4"></i> Tape le nom du pays
+                    </span>
+                </div>
+
+                <form onsubmit="handleTypeSubmit(event)" class="relative">
+                    <input type="text" id="type-input" placeholder="Tape ta réponse..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"
+                           class="w-full bg-slate-950 border-2 border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-3 pl-10 text-sm font-medium focus:border-amber-500 focus:outline-none transition shadow-inner">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
+                    <button type="submit" class="absolute right-2 top-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-md transition active:scale-95">
+                        Valider
+                    </button>
+                </form>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <button onclick="revealAnswer()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md">
+                        <i data-lucide="eye" class="w-4 h-4"></i> Révéler la réponse
+                    </button>
+                    <button onclick="skipQuestion()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1 transition active:scale-95">
+                        Passer <i data-lucide="skip-forward" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feedback Banner -->
+            <div id="feedback-banner" class="hidden shrink-0 mx-3 sm:mx-4 mt-3 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between gap-3 shadow-lg transition-all">
+                <span id="feedback-text" class="flex items-center gap-2"></span>
+                <button id="next-btn" class="hidden bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-xs transition">
+                    Suivant
+                </button>
+            </div>
+
+            <!-- Scrollable List -->
+            <div class="flex-1 p-3 sm:p-4 overflow-y-auto min-h-0">
+                <div class="flex items-center justify-between mb-2.5">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ou clique dans la liste :</span>
+                    <span id="country-count" class="text-xs font-semibold text-slate-500 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">0 éléments</span>
+                </div>
+
+                <div id="country-list" class="grid grid-cols-2 gap-1.5"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ======================= Library Modal (recherche) ======================= -->
+    <div id="library-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
+                <div class="flex items-center gap-2 text-indigo-300 font-bold text-base">
+                    <i data-lucide="library" class="w-5 h-5"></i> Bibliothèque de challenges
+                </div>
+                <button onclick="closeLibrary()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-4 border-b border-slate-800 space-y-3 shrink-0">
+                <div class="relative">
+                    <input type="text" id="lib-search" oninput="onLibrarySearchInput()" placeholder="Cherche par titre, description ou auteur..." autocomplete="off"
+                           class="w-full bg-slate-950 border-2 border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-2.5 pl-10 text-sm font-medium focus:border-indigo-500 focus:outline-none transition">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+                </div>
+                <div class="flex items-center gap-2 text-xs" id="lib-type-filters">
+                    <button data-type="ALL" onclick="setLibraryType('ALL')" class="lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition">Tous</button>
+                    <button data-type="COUNTRY" onclick="setLibraryType('COUNTRY')" class="lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition">Pays</button>
+                    <button data-type="CAPITAL" onclick="setLibraryType('CAPITAL')" class="lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition">Capitales</button>
+                </div>
+                <p id="lib-status" class="hidden text-[11px] rounded-lg px-3 py-2 border"></p>
+            </div>
+
+            <div id="lib-results" class="p-4 overflow-y-auto flex-1 space-y-4 min-h-0"></div>
+        </div>
+    </div>
+
+    <!-- ======================= Custom Challenge Modal ======================= -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i> Créer un challenge personnalisé
+                </div>
+                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Titre du challenge *</label>
+                        <input type="text" id="custom-title" maxlength="80" placeholder="ex: Capitales d'Europe de l'Est" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Type de devinette *</label>
+                        <select id="custom-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                            <option value="COUNTRY">Deviner les pays</option>
+                            <option value="CAPITAL">Deviner les capitales</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Description (optionnel)</label>
+                        <input type="text" id="custom-desc" maxlength="200" placeholder="ex: Révision avant l'examen de géo" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Ton nom (optionnel)</label>
+                        <input type="text" id="custom-author" maxlength="40" placeholder="ex: Alex" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                        <label class="font-bold text-slate-300">Pays inclus (<span id="selected-count">0</span>/<span id="total-count">100</span>) :</label>
+                        <div class="flex flex-wrap gap-2 items-center text-[11px]">
+                            <button onclick="selectRegion('Americas')" class="text-slate-300 hover:text-amber-400">+ Amériques</button>
+                            <button onclick="selectRegion('Europe')" class="text-slate-300 hover:text-amber-400">+ Europe</button>
+                            <button onclick="selectRegion('Asia')" class="text-slate-300 hover:text-amber-400">+ Asie</button>
+                            <button onclick="selectRegion('Africa')" class="text-slate-300 hover:text-amber-400">+ Afrique</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="selectAllCountries(true)" class="text-amber-400 hover:underline">Tout cocher</button>
+                            <button onclick="selectAllCountries(false)" class="text-slate-400 hover:underline">Tout décocher</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3 max-h-56 overflow-y-auto" id="country-checklist"></div>
+                </div>
+            </div>
+
+            <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex flex-wrap justify-end gap-2 sm:gap-3 shrink-0">
+                <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
+                    Annuler
+                </button>
+                <button id="save-challenge-btn" onclick="saveAndGenerateChallenge()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-5 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                    <i data-lucide="share-2" class="w-4 h-4"></i> Sauvegarder et obtenir le lien
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= Config Modal ======================= -->
+    <div id="config-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <div class="flex items-center gap-2 text-emerald-400 font-bold text-base">
+                    <i data-lucide="settings" class="w-5 h-5"></i> Configuration
+                </div>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-4 sm:p-6 space-y-4 text-xs">
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300 font-semibold">Clé Carto (variable Vercel)</span>
+                        <span id="status-carto" class="font-bold"></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300 font-semibold">Base de données des challenges</span>
+                        <span id="status-db" class="font-bold"></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-amber-400 mb-1">Clé API Carto (secours local, optionnel)</label>
+                    <input type="password" id="carto-key" placeholder="Utilisée seulement si Vercel n'en fournit pas" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-amber-500">
+                    <p class="text-[10px] text-slate-500 mt-1">La clé de Vercel (<code class="text-emerald-400">CARTO_API_KEY</code>) est prioritaire et n'est jamais envoyée au navigateur. Les fonds de carte CartoDB fonctionnent aussi sans clé.</p>
+                </div>
+
+                <p class="text-[11px] text-slate-400 leading-relaxed">
+                    Les identifiants de la base de données (<code class="text-emerald-400">KV_REST_API_URL</code> et <code class="text-emerald-400">KV_REST_API_TOKEN</code>) se configurent uniquement dans Vercel, jamais dans le navigateur.
+                </p>
+            </div>
+
+            <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex flex-wrap justify-end gap-2 sm:gap-3 shrink-0">
+                <button onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
+                    Fermer
+                </button>
+                <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                    <i data-lucide="save" class="w-4 h-4"></i> Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" style="bottom: calc(1.25rem + env(safe-area-inset-bottom))" class="hidden fixed left-1/2 -translate-x-1/2 z-[2000] max-w-[90vw] bg-slate-800 border border-slate-600 text-slate-100 text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl"></div>
+
+    <script>
+        // ======================= DONNÉES =======================
+        const countriesList = [
+            // AMÉRIQUES (24)
+            { id: "CAN", name: "Canada", capital: "Ottawa", region: "Americas", aliases: ["canada", "can"], capitalAliases: ["ottawa"] },
+            { id: "USA", name: "États-Unis", capital: "Washington", region: "Americas", aliases: ["etats unis", "etats-unis", "usa", "us"], capitalAliases: ["washington", "washington dc", "washington d.c."] },
+            { id: "MEX", name: "Mexique", capital: "Mexico", region: "Americas", aliases: ["mexique", "mexico"], capitalAliases: ["mexico", "mexico city"] },
+            { id: "GTM", name: "Guatemala", capital: "Guatemala", region: "Americas", aliases: ["guatemala"], capitalAliases: ["guatemala", "ciudad de guatemala"] },
+            { id: "HND", name: "Honduras", capital: "Tegucigalpa", region: "Americas", aliases: ["honduras"], capitalAliases: ["tegucigalpa"] },
+            { id: "SLV", name: "El Salvador", capital: "San Salvador", region: "Americas", aliases: ["el salvador", "salvador"], capitalAliases: ["san salvador"] },
+            { id: "NIC", name: "Nicaragua", capital: "Managua", region: "Americas", aliases: ["nicaragua"], capitalAliases: ["managua"] },
+            { id: "CRI", name: "Costa Rica", capital: "San José", region: "Americas", aliases: ["costa rica"], capitalAliases: ["san jose", "san josé"] },
+            { id: "PAN", name: "Panama", capital: "Panama", region: "Americas", aliases: ["panama"], capitalAliases: ["panama", "panama city"] },
+            { id: "CUB", name: "Cuba", capital: "La Havane", region: "Americas", aliases: ["cuba"], capitalAliases: ["la havane", "havane", "habana"] },
+            { id: "HTI", name: "Haïti", capital: "Port-au-Prince", region: "Americas", aliases: ["haiti"], capitalAliases: ["port au prince", "port-au-prince"] },
+            { id: "DOM", name: "République dominicaine", capital: "Saint-Domingue", region: "Americas", aliases: ["republique dominicaine", "rep dom"], capitalAliases: ["saint domingue", "santo domingo"] },
+            { id: "COL", name: "Colombie", capital: "Bogota", region: "Americas", aliases: ["colombie"], capitalAliases: ["bogota", "bogotá"] },
+            { id: "VEN", name: "Venezuela", capital: "Caracas", region: "Americas", aliases: ["venezuela"], capitalAliases: ["caracas"] },
+            { id: "GUY", name: "Guyana", capital: "Georgetown", region: "Americas", aliases: ["guyana"], capitalAliases: ["georgetown"] },
+            { id: "SUR", name: "Suriname", capital: "Paramaribo", region: "Americas", aliases: ["suriname"], capitalAliases: ["paramaribo"] },
+            { id: "ECU", name: "Équateur", capital: "Quito", region: "Americas", aliases: ["equateur"], capitalAliases: ["quito"] },
+            { id: "PER", name: "Pérou", capital: "Lima", region: "Americas", aliases: ["perou"], capitalAliases: ["lima"] },
+            { id: "BRA", name: "Brésil", capital: "Brasilia", region: "Americas", aliases: ["bresil", "brazil"], capitalAliases: ["brasilia"] },
+            { id: "BOL", name: "Bolivie", capital: "Sucre", region: "Americas", aliases: ["bolivie"], capitalAliases: ["sucre", "la paz"] },
+            { id: "PRY", name: "Paraguay", capital: "Asuncion", region: "Americas", aliases: ["paraguay"], capitalAliases: ["asuncion", "asunción"] },
+            { id: "CHL", name: "Chili", capital: "Santiago", region: "Americas", aliases: ["chili", "chile"], capitalAliases: ["santiago"] },
+            { id: "ARG", name: "Argentine", capital: "Buenos Aires", region: "Americas", aliases: ["argentine"], capitalAliases: ["buenos aires"] },
+            { id: "URY", name: "Uruguay", capital: "Montevideo", region: "Americas", aliases: ["uruguay"], capitalAliases: ["montevideo"] },
+
+            // EUROPE (30)
+            { id: "FRA", name: "France", capital: "Paris", region: "Europe", aliases: ["france"], capitalAliases: ["paris"] },
+            { id: "ESP", name: "Espagne", capital: "Madrid", region: "Europe", aliases: ["espagne", "spain"], capitalAliases: ["madrid"] },
+            { id: "GBR", name: "Royaume-Uni", capital: "Londres", region: "Europe", aliases: ["royaume-uni", "royaume uni", "uk", "angleterre"], capitalAliases: ["londres", "london"] },
+            { id: "DEU", name: "Allemagne", capital: "Berlin", region: "Europe", aliases: ["allemagne", "germany"], capitalAliases: ["berlin"] },
+            { id: "ITA", name: "Italie", capital: "Rome", region: "Europe", aliases: ["italie", "italy"], capitalAliases: ["rome", "roma"] },
+            { id: "BEL", name: "Belgique", capital: "Bruxelles", region: "Europe", aliases: ["belgique"], capitalAliases: ["bruxelles", "brussels"] },
+            { id: "NLD", name: "Pays-Bas", capital: "Amsterdam", region: "Europe", aliases: ["pays bas", "pays-bas", "hollande"], capitalAliases: ["amsterdam"] },
+            { id: "CHE", name: "Suisse", capital: "Berne", region: "Europe", aliases: ["suisse"], capitalAliases: ["berne", "bern"] },
+            { id: "AUT", name: "Autriche", capital: "Vienne", region: "Europe", aliases: ["autriche"], capitalAliases: ["vienne", "vienna"] },
+            { id: "POL", name: "Pologne", capital: "Varsovie", region: "Europe", aliases: ["pologne"], capitalAliases: ["varsovie", "warsaw"] },
+            { id: "HUN", name: "Hongrie", capital: "Budapest", region: "Europe", aliases: ["hongrie"], capitalAliases: ["budapest"] },
+            { id: "ROU", name: "Roumanie", capital: "Bucarest", region: "Europe", aliases: ["roumanie"], capitalAliases: ["bucarest", "bucharest"] },
+            { id: "BGR", name: "Bulgarie", capital: "Sofia", region: "Europe", aliases: ["bulgarie"], capitalAliases: ["sofia"] },
+            { id: "GRC", name: "Grèce", capital: "Athènes", region: "Europe", aliases: ["grece"], capitalAliases: ["athenes", "athens"] },
+            { id: "TUR", name: "Turquie", capital: "Ankara", region: "Europe", aliases: ["turquie", "turkiye"], capitalAliases: ["ankara"] },
+            { id: "UKR", name: "Ukraine", capital: "Kiev", region: "Europe", aliases: ["ukraine"], capitalAliases: ["kiev", "kyiv"] },
+            { id: "BLR", name: "Biélorussie", capital: "Minsk", region: "Europe", aliases: ["bielorussie", "belarus"], capitalAliases: ["minsk"] },
+            { id: "MDA", name: "Moldavie", capital: "Chisinau", region: "Europe", aliases: ["moldavie"], capitalAliases: ["chisinau"] },
+            { id: "NOR", name: "Norvège", capital: "Oslo", region: "Europe", aliases: ["norvege"], capitalAliases: ["oslo"] },
+            { id: "SWE", name: "Suède", capital: "Stockholm", region: "Europe", aliases: ["suede"], capitalAliases: ["stockholm"] },
+            { id: "FIN", name: "Finlande", capital: "Helsinki", region: "Europe", aliases: ["finlande"], capitalAliases: ["helsinki"] },
+            { id: "DNK", name: "Danemark", capital: "Copenhague", region: "Europe", aliases: ["danemark"], capitalAliases: ["copenhague", "copenhagen"] },
+            { id: "SVN", name: "Slovénie", capital: "Ljubljana", region: "Europe", aliases: ["slovenie"], capitalAliases: ["ljubljana"] },
+            { id: "HRV", name: "Croatie", capital: "Zagreb", region: "Europe", aliases: ["croatie"], capitalAliases: ["zagreb"] },
+            { id: "BIH", name: "Bosnie-Herzégovine", capital: "Sarajevo", region: "Europe", aliases: ["bosnie", "bosnie herzegovine"], capitalAliases: ["sarajevo"] },
+            { id: "SRB", name: "Serbie", capital: "Belgrade", region: "Europe", aliases: ["serbie"], capitalAliases: ["belgrade"] },
+            { id: "MNE", name: "Monténégro", capital: "Podgorica", region: "Europe", aliases: ["montenegro"], capitalAliases: ["podgorica"] },
+            { id: "ALB", name: "Albanie", capital: "Tirana", region: "Europe", aliases: ["albanie"], capitalAliases: ["tirana"] },
+            { id: "XKX", name: "Kosovo", capital: "Pristina", region: "Europe", aliases: ["kosovo"], capitalAliases: ["pristina"] },
+            { id: "RUS", name: "Russie", capital: "Moscou", region: "Europe", aliases: ["russie", "russia"], capitalAliases: ["moscou", "moscow"] },
+
+            // ASIE & MOYEN-ORIENT (26)
+            { id: "CHN", name: "Chine", capital: "Pékin", region: "Asia", aliases: ["chine", "china"], capitalAliases: ["pekin", "beijing"] },
+            { id: "IND", name: "Inde", capital: "New Delhi", region: "Asia", aliases: ["inde", "india"], capitalAliases: ["new delhi", "delhi"] },
+            { id: "JPN", name: "Japon", capital: "Tokyo", region: "Asia", aliases: ["japon", "japan"], capitalAliases: ["tokyo"] },
+            { id: "KOR", name: "Corée du Sud", capital: "Séoul", region: "Asia", aliases: ["coree du sud", "coree sud"], capitalAliases: ["seoul", "séoul"] },
+            { id: "PRK", name: "Corée du Nord", capital: "Pyongyang", region: "Asia", aliases: ["coree du nord", "coree nord"], capitalAliases: ["pyongyang"] },
+            { id: "PAK", name: "Pakistan", capital: "Islamabad", region: "Asia", aliases: ["pakistan"], capitalAliases: ["islamabad"] },
+            { id: "AFG", name: "Afghanistan", capital: "Kaboul", region: "Asia", aliases: ["afghanistan"], capitalAliases: ["kaboul", "kabul"] },
+            { id: "BGD", name: "Bangladesh", capital: "Dacca", region: "Asia", aliases: ["bangladesh"], capitalAliases: ["dacca", "dhaka"] },
+            { id: "MMR", name: "Myanmar", capital: "Naypyidaw", region: "Asia", aliases: ["myanmar", "birmanie"], capitalAliases: ["naypyidaw"] },
+            { id: "THA", name: "Thaïlande", capital: "Bangkok", region: "Asia", aliases: ["thailande"], capitalAliases: ["bangkok"] },
+            { id: "LAO", name: "Laos", capital: "Vientiane", region: "Asia", aliases: ["laos"], capitalAliases: ["vientiane"] },
+            { id: "KHM", name: "Cambodge", capital: "Phnom Penh", region: "Asia", aliases: ["cambodge"], capitalAliases: ["phnom penh"] },
+            { id: "VNM", name: "Vietnam", capital: "Hanoï", region: "Asia", aliases: ["vietnam"], capitalAliases: ["hanoi", "hanoï"] },
+            { id: "IDN", name: "Indonésie", capital: "Jakarta", region: "Asia", aliases: ["indonesie"], capitalAliases: ["jakarta"] },
+            { id: "PHL", name: "Philippines", capital: "Manille", region: "Asia", aliases: ["philippines"], capitalAliases: ["manille", "manila"] },
+            { id: "TLS", name: "Timor-Leste", capital: "Dili", region: "Asia", aliases: ["timor leste", "timor oriental"], capitalAliases: ["dili"] },
+            { id: "IRN", name: "Iran", capital: "Téhéran", region: "Asia", aliases: ["iran"], capitalAliases: ["teheran", "téhéran"] },
+            { id: "IRQ", name: "Irak", capital: "Bagdad", region: "Asia", aliases: ["irak", "iraq"], capitalAliases: ["bagdad", "baghdad"] },
+            { id: "SYR", name: "Syrie", capital: "Damas", region: "Asia", aliases: ["syrie"], capitalAliases: ["damas", "damascus"] },
+            { id: "LBN", name: "Liban", capital: "Beyrouth", region: "Asia", aliases: ["liban"], capitalAliases: ["beyrouth", "beirut"] },
+            { id: "ISR", name: "Israël", capital: "Jérusalem", region: "Asia", aliases: ["israel"], capitalAliases: ["jerusalem", "jérusalem"] },
+            { id: "SAU", name: "Arabie Saoudite", capital: "Riyad", region: "Asia", aliases: ["arabie saoudite"], capitalAliases: ["riyad", "riyadh"] },
+            { id: "YEM", name: "Yémen", capital: "Sanaa", region: "Asia", aliases: ["yemen"], capitalAliases: ["sanaa", "sana'a"] },
+            { id: "ARM", name: "Arménie", capital: "Erevan", region: "Asia", aliases: ["armenie"], capitalAliases: ["erevan", "yerevan"] },
+            { id: "AZE", name: "Azerbaïdjan", capital: "Bakou", region: "Asia", aliases: ["azerbaidjan"], capitalAliases: ["bakou", "baku"] },
+            { id: "GEO", name: "Géorgie", capital: "Tbilissi", region: "Asia", aliases: ["georgie"], capitalAliases: ["tbilissi", "tbilisi"] },
+
+            // AFRIQUE (20)
+            { id: "MAR", name: "Maroc", capital: "Rabat", region: "Africa", aliases: ["maroc"], capitalAliases: ["rabat"] },
+            { id: "DZA", name: "Algérie", capital: "Alger", region: "Africa", aliases: ["algerie"], capitalAliases: ["alger", "algiers"] },
+            { id: "TUN", name: "Tunisie", capital: "Tunis", region: "Africa", aliases: ["tunisie"], capitalAliases: ["tunis"] },
+            { id: "LBY", name: "Libye", capital: "Tripoli", region: "Africa", aliases: ["libye"], capitalAliases: ["tripoli"] },
+            { id: "EGY", name: "Égypte", capital: "Le Caire", region: "Africa", aliases: ["egypte"], capitalAliases: ["le caire", "caire", "cairo"] },
+            { id: "SDN", name: "Soudan", capital: "Khartoum", region: "Africa", aliases: ["soudan"], capitalAliases: ["khartoum"] },
+            { id: "SSD", name: "Soudan du Sud", capital: "Juba", region: "Africa", aliases: ["soudan du sud", "sud soudan"], capitalAliases: ["juba"] },
+            { id: "ETH", name: "Éthiopie", capital: "Addis-Abeba", region: "Africa", aliases: ["ethiopie"], capitalAliases: ["addis abeba", "addis-abeba"] },
+            { id: "SOM", name: "Somalie", capital: "Mogadiscio", region: "Africa", aliases: ["somalie"], capitalAliases: ["mogadiscio", "mogadishu"] },
+            { id: "UGA", name: "Ouganda", capital: "Kampala", region: "Africa", aliases: ["ouganda"], capitalAliases: ["kampala"] },
+            { id: "RWA", name: "Rwanda", capital: "Kigali", region: "Africa", aliases: ["rwanda"], capitalAliases: ["kigali"] },
+            { id: "COD", name: "République démocratique du Congo", capital: "Kinshasa", region: "Africa", aliases: ["congo", "rdc", "republique democratique du congo"], capitalAliases: ["kinshasa"] },
+            { id: "CAF", name: "République centrafricaine", capital: "Bangui", region: "Africa", aliases: ["centrafrique", "republique centrafricaine"], capitalAliases: ["bangui"] },
+            { id: "TCD", name: "Tchad", capital: "N'Djaména", region: "Africa", aliases: ["tchad"], capitalAliases: ["ndjamena", "n'djamena", "n djamena"] },
+            { id: "MLI", name: "Mali", capital: "Bamako", region: "Africa", aliases: ["mali"], capitalAliases: ["bamako"] },
+            { id: "SEN", name: "Sénégal", capital: "Dakar", region: "Africa", aliases: ["senegal"], capitalAliases: ["dakar"] },
+            { id: "NGA", name: "Nigéria", capital: "Abuja", region: "Africa", aliases: ["nigeria"], capitalAliases: ["abuja"] },
+            { id: "BWA", name: "Botswana", capital: "Gaborone", region: "Africa", aliases: ["botswana"], capitalAliases: ["gaborone"] },
+            { id: "ZWE", name: "Zimbabwe", capital: "Harare", region: "Africa", aliases: ["zimbabwe"], capitalAliases: ["harare"] },
+            { id: "MDG", name: "Madagascar", capital: "Antananarivo", region: "Africa", aliases: ["madagascar"], capitalAliases: ["antananarivo", "tana"] }
+        ];
+
+        const countryById = Object.fromEntries(countriesList.map(c => [c.id, c]));
+
+        // Identifiants alternatifs dans le fichier GeoJSON Natural Earth
+        const GEO_ALT_IDS = { XKX: ["KOS"], SSD: ["SDS"] };
+
+        // Challenges officiels (générés à partir de la liste des pays)
+        const PRESET_GROUPS = [
+            { key: "WORLD",    label: "Monde",                filter: () => true },
+            { key: "Americas", label: "Amériques",            filter: c => c.region === "Americas" },
+            { key: "Europe",   label: "Europe",               filter: c => c.region === "Europe" },
+            { key: "Asia",     label: "Asie & Moyen-Orient",  filter: c => c.region === "Asia" },
+            { key: "Africa",   label: "Afrique",              filter: c => c.region === "Africa" }
+        ];
+
+        const PRESETS = [];
+        PRESET_GROUPS.forEach(group => {
+            ["COUNTRY", "CAPITAL"].forEach(type => {
+                const ids = countriesList.filter(group.filter).map(c => c.id);
+                PRESETS.push({
+                    id: `${group.key}_${type}`,
+                    title: `${group.label} – ${type === "COUNTRY" ? "Pays" : "Capitales"}`,
+                    type,
+                    desc: group.key === "WORLD"
+                        ? `Tous les ${type === "COUNTRY" ? "pays" : "pays (devine la capitale)"} de la carte`
+                        : `${type === "COUNTRY" ? "Les pays" : "Les capitales"} de la zone ${group.label}`,
+                    author: "GeoMaster",
+                    countryIds: ids,
+                    source: "preset"
+                });
+            });
+        });
+
+        // ======================= ÉTAT =======================
+        let map;
+        let tileLayerInstance = null;
+        let highlightedLayer = null;
+        let resultGroup = null;          // couches colorées permanentes (résultats)
+        let worldGeoData = null;
+
+        let currentChallenge = null;
+        let fullPool = [];
+        let activePool = [];
+        let currentTarget = null;
+        let answered = false;
+
+        let streak = 0;
+        let totalAnswered = 0;
+        let pointsTotal = 0;             // somme des points pour le pourcentage
+        let attempts = 0;                // essais ratés sur la question en cours
+        let results = {};                // id -> "white" | "light" | "dark" | "red"
+        let advanceTimer = null;
+        let autoZoom = true;
+
+        const MAX_ATTEMPTS = 4;
+        const POINTS = [1, 2 / 3, 1 / 3, 1 / 3];   // réussite au 1er, 2e, 3e, 4e essai
+        const RESULT_STYLES = {
+            white: { fill: "#ffffff", btn: "bg-white text-slate-900 border-white" },
+            light: { fill: "#fde68a", btn: "bg-yellow-200 text-slate-900 border-yellow-200" },
+            dark:  { fill: "#ca8a04", btn: "bg-yellow-600 text-white border-yellow-600" },
+            red:   { fill: "#dc2626", btn: "bg-red-600 text-white border-red-600" }
+        };
+
+        let serverCartoEnabled = false;
+        let dbConfigured = null;
+
+        const challengeType = () => (currentChallenge && currentChallenge.type) || "COUNTRY";
+
+        // ======================= UTILITAIRES =======================
+        function normalizeString(str) {
+            return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function el(tag, className, text) {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text !== undefined) node.textContent = text;
+            return node;
+        }
+
+        let toastTimer = null;
+        function showToast(message, duration = 3500) {
+            const t = document.getElementById("toast");
+            t.textContent = message;
+            t.classList.remove("hidden");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => t.classList.add("hidden"), duration);
+        }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (e) {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                let ok = false;
+                try { ok = document.execCommand("copy"); } catch (err) {}
+                document.body.removeChild(ta);
+                return ok;
+            }
+        }
+
+        function sanitizeChallenge(obj) {
+            if (!obj || typeof obj !== "object") return null;
+            const ids = Array.isArray(obj.countryIds) ? obj.countryIds.filter(id => countryById[id]) : [];
+            if (ids.length < 1 || typeof obj.title !== "string" || !obj.title.trim()) return null;
+            return {
+                id: typeof obj.id === "string" ? obj.id : null,
+                title: obj.title.trim().slice(0, 80),
+                type: obj.type === "CAPITAL" ? "CAPITAL" : "COUNTRY",
+                desc: typeof obj.desc === "string" ? obj.desc.slice(0, 200) : "",
+                author: typeof obj.author === "string" ? obj.author.slice(0, 40) : "",
+                countryIds: [...new Set(ids)],
+                createdAt: obj.createdAt || Date.now()
+            };
+        }
+
+        // ======================= INITIALISATION =======================
+        document.addEventListener("DOMContentLoaded", async () => {
+            buildPresetSelect();
+            populateChecklist();
+            lucide.createIcons();
+
+            await fetchServerConfig();
+            initMap();
+            setupResponsiveBehavior();
+
+            const started = await checkUrlForSharedChallenge();
+            if (!started) startChallenge(PRESETS[0]);
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                closeLibrary();
+                closeCustomChallengeModal();
+                closeConfigModal();
+            }
+        });
+
+        async function fetchServerConfig() {
+            try {
+                const res = await fetch("/api/config", { cache: "no-store" });
+                if (res.ok) {
+                    const data = await res.json();
+                    serverCartoEnabled = Boolean(data.CARTO_PROXY);
+                    dbConfigured = Boolean(data.DB_CONFIGURED);
+                }
+            } catch (e) {
+                console.warn("Pas d'endpoint /api/config (mode local ?), utilisation du localStorage.");
+            }
+        }
+
+        function getCartoKey() {
+            return localStorage.getItem("CARTO_API_KEY") || "";
+        }
+
+        function initMap() {
+            map = L.map("map", { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 7, zoomControl: false });
+            L.control.zoom({ position: "topright" }).addTo(map);
+
+            updateMapTileLayer();
+            resultGroup = L.layerGroup().addTo(map);
+
+            fetch("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
+                .then(res => res.json())
+                .then(data => {
+                    worldGeoData = data;
+                    repaintResults();
+                    if (currentTarget) highlightTargetOnMap(currentTarget);
+                })
+                .catch(err => {
+                    console.error("Erreur GeoJSON", err);
+                    showToast("Impossible de charger les frontières des pays.");
+                });
+        }
+
+        function updateMapTileLayer() {
+            if (tileLayerInstance) map.removeLayer(tileLayerInstance);
+
+            const localKey = getCartoKey();
+            let tileUrl, options;
+
+            if (serverCartoEnabled) {
+                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}&v=5";
+                options = { attribution: "&copy; OpenStreetMap, CARTO", maxZoom: 19 };
+            } else if (localKey) {
+                tileUrl = `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(localKey)}`;
+                options = { attribution: "&copy; OpenStreetMap, CARTO", subdomains: "abcd", maxZoom: 19 };
+            } else {
+                tileUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+                options = { attribution: "Tiles &copy; Esri", maxZoom: 16 };
+            }
+
+            tileLayerInstance = L.tileLayer(tileUrl, options).addTo(map);
+            tileLayerInstance.bringToBack();
+        }
+
+        // ======================= CHALLENGES =======================
+        function buildPresetSelect() {
+            const select = document.getElementById("preset-select");
+            select.innerHTML = "";
+
+            const hidden = document.createElement("option");
+            hidden.value = "";
+            hidden.id = "preset-custom-option";
+            hidden.textContent = "Challenge de la bibliothèque";
+            hidden.hidden = true;
+            select.appendChild(hidden);
+
+            const groupWorld = document.createElement("optgroup");
+            groupWorld.label = "🌍 Challenges généraux";
+            const groupRegions = document.createElement("optgroup");
+            groupRegions.label = "🗺️ Cartes par continent";
+
+            PRESETS.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = `${p.title} (${p.countryIds.length})`;
+                (p.id.startsWith("WORLD") ? groupWorld : groupRegions).appendChild(opt);
+            });
+
+            select.appendChild(groupWorld);
+            select.appendChild(groupRegions);
+        }
+
+        function onPresetChange() {
+            const id = document.getElementById("preset-select").value;
+            const preset = PRESETS.find(p => p.id === id);
+            if (!preset) return;
+            window.history.replaceState({}, document.title, window.location.pathname);
+            startChallenge(preset);
+        }
+
+        function startChallenge(data) {
+            currentChallenge = data;
+            const isPreset = data.source === "preset";
+
+            const select = document.getElementById("preset-select");
+            select.value = isPreset ? data.id : "";
+
+            const banner = document.getElementById("custom-challenge-banner");
+            if (isPreset) {
+                banner.classList.add("hidden");
+            } else {
+                document.getElementById("custom-banner-title").innerText = data.title;
+                document.getElementById("custom-banner-desc").innerText = data.desc ? `— ${data.desc}` : "";
+                banner.classList.remove("hidden");
+            }
+
+            updateUIForMode();
+            startNewSession(countriesList.filter(c => data.countryIds.includes(c.id)));
+        }
+
+        function resetToDefaultChallenge() {
+            window.history.replaceState({}, document.title, window.location.pathname);
+            startChallenge(PRESETS[0]);
+        }
+
+        function updateUIForMode() {
+            const badge = document.getElementById("mode-badge");
+            const prompt = document.getElementById("target-prompt");
+            const input = document.getElementById("type-input");
+
+            if (challengeType() === "CAPITAL") {
+                badge.innerText = "Mode Capitales";
+                prompt.innerHTML = `<i data-lucide="building-2" class="w-4 h-4 text-amber-400"></i> Tape la capitale du pays surligné`;
+                input.placeholder = "Tape le nom de la capitale...";
+            } else {
+                badge.innerText = "Mode Pays";
+                prompt.innerHTML = `<i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i> Tape le nom du pays surligné`;
+                input.placeholder = "Tape le nom du pays...";
+            }
+            lucide.createIcons();
+        }
+
+        function startNewSession(pool) {
+            clearTimeout(advanceTimer);
+            streak = 0;
+            totalAnswered = 0;
+            pointsTotal = 0;
+            attempts = 0;
+            results = {};
+            if (resultGroup) resultGroup.clearLayers();
+            fullPool = [...pool];
+            activePool = [...pool];
+            shuffleArray(activePool);
+            updateDashboard();
+            renderCountryList();
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            clearTimeout(advanceTimer);
+            document.getElementById("feedback-banner").classList.add("hidden");
+            answered = false;
+            attempts = 0;
+
+            const inputField = document.getElementById("type-input");
+            inputField.value = "";
+            inputField.focus();
+
+            if (activePool.length === 0) {
+                currentTarget = null;
+                if (highlightedLayer) { map.removeLayer(highlightedLayer); highlightedLayer = null; }
+                document.getElementById("target-map-label").innerText = "Session terminée";
+                showFeedback(
+                    `🎉 Session terminée ! Score : ${getPercent()} %`,
+                    "bg-indigo-600 text-white",
+                    true, "Rejouer", restartSession
+                );
+                return;
+            }
+
+            currentTarget = activePool.pop();
+            document.getElementById("target-map-label").innerText =
+                `Cible ${Math.min(totalAnswered + 1, fullPool.length)} / ${fullPool.length}`;
+            highlightTargetOnMap(currentTarget);
+        }
+
+        function restartSession() {
+            startNewSession(countriesList.filter(c => currentChallenge.countryIds.includes(c.id)));
+        }
+
+        // ======================= CARTE =======================
+        function findFeature(country) {
+            const ids = [country.id, ...(GEO_ALT_IDS[country.id] || [])];
+            const wantedName = normalizeString(country.name);
+            return worldGeoData.features.find(f => {
+                const p = f.properties || {};
+                if ([p.ADM0_A3, p.ISO_A3, p.ISO_A3_EH].some(v => v && ids.includes(v))) return true;
+                return normalizeString(p.NAME_FR) === wantedName;
+            });
+        }
+
+        function highlightTargetOnMap(country) {
+            if (!worldGeoData || !map) return;
+            if (highlightedLayer) { map.removeLayer(highlightedLayer); highlightedLayer = null; }
+
+            const feature = findFeature(country);
+            if (!feature) {
+                showToast(`Le pays « ${country.name} » est introuvable sur la carte.`);
+                return;
+            }
+
+            highlightedLayer = L.geoJSON(feature, { style: { className: "highlighted-country" } }).addTo(map);
+
+            if (autoZoom) {
+                const pad = map.getSize().x < 500 ? 20 : 50;
+                map.fitBounds(highlightedLayer.getBounds(), { padding: [pad, pad], maxZoom: 5, animate: true, duration: 0.8 });
+            }
+        }
+
+        // Colore un pays de façon permanente sur la carte
+        function paintCountryOnMap(country, state) {
+            if (highlightedLayer) { map.removeLayer(highlightedLayer); highlightedLayer = null; }
+            if (!worldGeoData || !resultGroup) return;
+            const feature = findFeature(country);
+            if (!feature) return;
+            L.geoJSON(feature, {
+                style: { fillColor: RESULT_STYLES[state].fill, fillOpacity: 0.9, color: "#64748b", weight: 1 },
+                interactive: false
+            }).addTo(resultGroup);
+        }
+
+        // Redessine tous les résultats (si le GeoJSON arrive après les premières réponses)
+        function repaintResults() {
+            if (!resultGroup || !worldGeoData) return;
+            resultGroup.clearLayers();
+            Object.entries(results).forEach(([id, state]) => {
+                const feature = findFeature(countryById[id]);
+                if (!feature) return;
+                L.geoJSON(feature, {
+                    style: { fillColor: RESULT_STYLES[state].fill, fillOpacity: 0.9, color: "#64748b", weight: 1 },
+                    interactive: false
+                }).addTo(resultGroup);
+            });
+        }
+
+        function toggleAutoZoom() {
+            autoZoom = !autoZoom;
+            document.getElementById("zoom-toggle-text").innerText = `Zoom auto : ${autoZoom ? "OUI" : "NON"}`;
+            if (autoZoom && currentTarget) highlightTargetOnMap(currentTarget);
+        }
+
+        function resetMapView() { map.setView([20, 0], 2); }
+
+        // ======================= JEU =======================
+        function getPercent() {
+            return totalAnswered ? Math.round((pointsTotal / totalAnswered) * 100) : 0;
+        }
+
+        function answerText() {
+            return challengeType() === "CAPITAL"
+                ? `${currentTarget.capital} (pays : ${currentTarget.name})`
+                : currentTarget.name;
+        }
+
+        // Termine la question, fige les couleurs et passe à la suivante
+        function finishQuestion(state, points, msg, bgClass, delay) {
+            answered = true;
+            totalAnswered++;
+            pointsTotal += points;
+            results[currentTarget.id] = state;
+            updateDashboard();
+            markListButton(currentTarget.id, state);
+            paintCountryOnMap(currentTarget, state);
+            showFeedback(msg, bgClass, true);
+            clearTimeout(advanceTimer);
+            advanceTimer = setTimeout(nextQuestion, delay);
+        }
+
+        function handleTypeSubmit(e) {
+            e.preventDefault();
+            if (answered) return;
+
+            const input = document.getElementById("type-input");
+            const inputVal = normalizeString(input.value);
+            if (!inputVal || !currentTarget) return;
+
+            let isCorrect;
+            if (challengeType() === "CAPITAL") {
+                isCorrect = currentTarget.capitalAliases.some(a => normalizeString(a) === inputVal) ||
+                            normalizeString(currentTarget.capital) === inputVal;
+            } else {
+                isCorrect = currentTarget.aliases.some(a => normalizeString(a) === inputVal) ||
+                            normalizeString(currentTarget.name) === inputVal;
+            }
+
+            if (isCorrect) handleSuccess();
+            else {
+                handleFailure("Mauvaise réponse, réessaie !");
+                input.value = "";
+                input.focus();
+            }
+        }
+
+        function selectCountryFromList(countryId) {
+            if (!currentTarget || answered || results[countryId]) return;
+            if (countryId === currentTarget.id) handleSuccess();
+            else handleFailure(challengeType() === "CAPITAL" ? "Ce n'est pas la bonne capitale !" : "Ce n'est pas ce pays !");
+        }
+
+        function handleSuccess() {
+            const state = attempts === 0 ? "white" : attempts === 1 ? "light" : "dark";
+            streak = attempts === 0 ? streak + 1 : 0;
+            const text = challengeType() === "CAPITAL"
+                ? `${currentTarget.capital} (${currentTarget.name})`
+                : currentTarget.name;
+            finishQuestion(state, POINTS[attempts],
+                `Bravo ! C'est bien ${text}` + (attempts ? ` (essai ${attempts + 1}/${MAX_ATTEMPTS})` : ""),
+                "bg-emerald-950/90 text-emerald-200 border border-emerald-500/50", 900);
+        }
+
+        function handleFailure(msg) {
+            attempts++;
+            streak = 0;
+            if (attempts >= MAX_ATTEMPTS) {
+                finishQuestion("red", 0, `❌ Raté ! C'était : ${answerText()}`,
+                    "bg-rose-950/90 text-rose-200 border border-rose-500/50", 2200);
+                return;
+            }
+            updateDashboard();
+            showFeedback(`${msg} (essai ${attempts}/${MAX_ATTEMPTS})`,
+                "bg-amber-950/90 text-amber-200 border border-amber-500/50", false);
+        }
+
+        function revealAnswer() {
+            if (!currentTarget || answered) return;
+            streak = 0;
+            finishQuestion("red", 0, `C'était : ${answerText()}`,
+                "bg-rose-950/90 text-rose-200 border border-rose-500/50", 2200);
+        }
+
+        function skipQuestion() {
+            if (!currentTarget) return;
+            // Une question passée sans réponse revient plus tard dans la session (avec ses 4 essais)
+            if (!answered) {
+                if (activePool.length === 0) { showToast("C'est la dernière question."); return; }
+                activePool.unshift(currentTarget);
+            }
+            nextQuestion();
+        }
+
+        function showFeedback(text, bgClass, showNext, nextLabel = "Suivant", nextAction = nextQuestion) {
+            const banner = document.getElementById("feedback-banner");
+            const textEl = document.getElementById("feedback-text");
+            const nextBtn = document.getElementById("next-btn");
+
+            banner.className = `shrink-0 mx-3 sm:mx-4 mt-3 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-3 shadow-lg ${bgClass}`;
+            textEl.innerText = text;
+
+            nextBtn.innerText = nextLabel;
+            nextBtn.onclick = nextAction;
+            nextBtn.classList.toggle("hidden", !showNext);
+        }
+
+        function updateDashboard() {
+            document.getElementById("stat-score").innerText = `${getPercent()}%`;
+            document.getElementById("stat-streak").innerText = `${streak} 🔥`;
+            document.getElementById("stat-progress").innerText = `${totalAnswered} / ${fullPool.length}`;
+        }
+
+        function renderCountryList() {
+            const listEl = document.getElementById("country-list");
+            const sorted = [...fullPool].sort((a, b) => {
+                const A = challengeType() === "CAPITAL" ? a.capital : a.name;
+                const B = challengeType() === "CAPITAL" ? b.capital : b.name;
+                return A.localeCompare(B, "fr");
+            });
+            document.getElementById("country-count").innerText = `${sorted.length} éléments`;
+
+            listEl.innerHTML = "";
+            sorted.forEach(c => {
+                const btn = document.createElement("button");
+                btn.id = `btn-country-${c.id}`;
+                btn.className = "w-full text-left bg-slate-950 hover:bg-slate-800 text-slate-300 font-medium px-3 py-2 rounded-xl border border-slate-800 hover:border-slate-700 text-xs transition flex items-center justify-between group active:scale-98";
+                btn.onclick = () => selectCountryFromList(c.id);
+
+                const label = el("span", "truncate", challengeType() === "CAPITAL" ? c.capital : c.name);
+                btn.appendChild(label);
+                btn.insertAdjacentHTML("beforeend", `<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-amber-400 transition"></i>`);
+                listEl.appendChild(btn);
+            });
+            lucide.createIcons();
+        }
+
+        function markListButton(id, state) {
+            const btn = document.getElementById(`btn-country-${id}`);
+            if (!btn) return;
+            btn.disabled = true;
+            btn.className = `w-full text-left font-bold px-3 py-2 rounded-xl border text-xs flex items-center justify-between cursor-not-allowed ${RESULT_STYLES[state].btn}`;
+
+            // En mode capitales, on affiche le pays une fois la question terminée
+            if (challengeType() === "CAPITAL") {
+                btn.innerHTML = "";
+                btn.appendChild(el("span", "truncate", `${countryById[id].capital} (${countryById[id].name})`));
+            }
+        }
+
+        // ======================= BIBLIOTHÈQUE (recherche) =======================
+        let libType = "ALL";
+        let libDbItems = [];
+        let libDbStatus = "idle";
+        let libDbError = "";
+        let libVisible = [];
+        let libTimer = null;
+        let libRequestId = 0;
+
+        function openLibrary() {
+            document.getElementById("library-modal").classList.remove("hidden");
+            lucide.createIcons();
+            const input = document.getElementById("lib-search");
+            input.focus();
+            input.select();
+            updateLibraryTypeButtons();
+            loadLibraryFromDb();
+        }
+
+        function closeLibrary() {
+            document.getElementById("library-modal").classList.add("hidden");
+        }
+
+        function onLibrarySearchInput() {
+            renderLibrary();
+            clearTimeout(libTimer);
+            libTimer = setTimeout(loadLibraryFromDb, 250);
+        }
+
+        function setLibraryType(type) {
+            libType = type;
+            updateLibraryTypeButtons();
+            renderLibrary();
+        }
+
+        function updateLibraryTypeButtons() {
+            document.querySelectorAll(".lib-type-btn").forEach(btn => {
+                const active = btn.dataset.type === libType;
+                btn.className = "lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition " +
+                    (active
+                        ? "bg-indigo-600 border-indigo-400 text-white"
+                        : "bg-slate-950 border-slate-700 text-slate-300 hover:bg-slate-800");
+            });
+        }
+
+        async function loadLibraryFromDb() {
+            const requestId = ++libRequestId;
+            const q = document.getElementById("lib-search").value.trim();
+            libDbStatus = "loading";
+            renderLibrary();
+
+            try {
+                const res = await fetch(`/api/challenges?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+                if (requestId !== libRequestId) return;
+
+                if (res.status === 503) {
+                    libDbStatus = "nodb";
+                    libDbItems = [];
+                } else if (!res.ok) {
+                    throw new Error("HTTP " + res.status);
+                } else {
+                    const data = await res.json();
+                    libDbItems = (data.challenges || []).map(sanitizeChallenge).filter(Boolean);
+                    libDbItems.forEach(c => c.source = "db");
+                    libDbStatus = "ok";
+                }
+            } catch (e) {
+                if (requestId !== libRequestId) return;
+                console.warn("Recherche base de données impossible", e);
+                libDbStatus = "error";
+                libDbError = e && e.message ? e.message : "inconnue";
+                libDbItems = [];
+            }
+            renderLibrary();
+        }
+
+        function renderLibrary() {
+            const q = normalizeString(document.getElementById("lib-search").value);
+            const matches = c =>
+                (libType === "ALL" || c.type === libType) &&
+                (!q || normalizeString(`${c.title} ${c.desc} ${c.author}`).includes(q));
+
+            const dbItems = libDbItems.filter(matches);
+            const presets = PRESETS.filter(matches);
+            libVisible = [...dbItems, ...presets];
+
+            const status = document.getElementById("lib-status");
+            const statusStyles = {
+                nodb:  ["bg-amber-950/60 border-amber-500/40 text-amber-200", "Base de données non configurée : seuls les challenges officiels sont affichés."],
+                error: ["bg-rose-950/60 border-rose-500/40 text-rose-200", `Impossible de joindre la base de données (${libDbError}). 404 = dossier api/ absent du déploiement ou site ouvert en local ; 500 = identifiants de la base incorrects. Seuls les challenges officiels sont affichés.`],
+                loading: ["bg-slate-950 border-slate-800 text-slate-400", "Recherche dans la base de données..."]
+            };
+            if (statusStyles[libDbStatus]) {
+                status.className = `text-[11px] rounded-lg px-3 py-2 border ${statusStyles[libDbStatus][0]}`;
+                status.textContent = statusStyles[libDbStatus][1];
+            } else {
+                status.className = "hidden";
+            }
+
+            const container = document.getElementById("lib-results");
+            container.innerHTML = "";
+
+            if (libVisible.length === 0) {
+                container.appendChild(el("p", "text-center text-slate-500 text-sm py-8", "Aucun challenge ne correspond à ta recherche."));
+                return;
+            }
+
+            if (dbItems.length > 0) container.appendChild(buildLibrarySection("Créés par la communauté", dbItems, 0));
+            if (presets.length > 0) container.appendChild(buildLibrarySection("Challenges officiels", presets, dbItems.length));
+            lucide.createIcons();
+        }
+
+        function buildLibrarySection(title, items, offset) {
+            const section = el("div", "space-y-2");
+            section.appendChild(el("h3", "text-[11px] font-bold text-slate-400 uppercase tracking-wider", `${title} (${items.length})`));
+
+            items.forEach((c, i) => {
+                const card = el("button", "w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/60 rounded-xl px-4 py-3 transition flex items-center justify-between gap-3 active:scale-[0.99]");
+                card.onclick = () => playLibraryItem(offset + i);
+
+                const info = el("div", "min-w-0");
+                info.appendChild(el("div", "font-bold text-sm text-white truncate", c.title));
+
+                const meta = [
+                    c.type === "CAPITAL" ? "Capitales" : "Pays",
+                    `${c.countryIds.length} éléments`,
+                    c.author ? `par ${c.author}` : null
+                ].filter(Boolean).join(" · ");
+                info.appendChild(el("div", "text-[11px] text-slate-400 mt-0.5", meta));
+                if (c.desc) info.appendChild(el("div", "text-[11px] text-slate-500 mt-1 truncate", c.desc));
+
+                const play = el("span", "shrink-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg", "Jouer");
+
+                card.appendChild(info);
+                card.appendChild(play);
+                section.appendChild(card);
+            });
+            return section;
+        }
+
+        function playLibraryItem(index) {
+            const challenge = libVisible[index];
+            if (!challenge) return;
+            closeLibrary();
+
+            if (challenge.source === "db" && challenge.id) {
+                window.history.replaceState({}, document.title, `${window.location.pathname}?cId=${challenge.id}`);
+            } else {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            startChallenge(challenge);
+        }
+
+        // ======================= CRÉATION DE CHALLENGE =======================
+        function populateChecklist() {
+            const container = document.getElementById("country-checklist");
+            container.innerHTML = "";
+            document.getElementById("total-count").innerText = countriesList.length;
+
+            [...countriesList].sort((a, b) => a.name.localeCompare(b.name, "fr")).forEach(c => {
+                const label = document.createElement("label");
+                label.className = "flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer select-none text-[11px]";
+                label.innerHTML = `<input type="checkbox" value="${c.id}" data-region="${c.region}" onchange="updateSelectedCount()" class="chk-country rounded accent-amber-500 bg-slate-900 border-slate-700"> <span class="truncate"></span>`;
+                label.querySelector("span").textContent = c.name;
+                container.appendChild(label);
+            });
+        }
+
+        function selectAllCountries(status) {
+            document.querySelectorAll(".chk-country").forEach(cb => cb.checked = status);
+            updateSelectedCount();
+        }
+
+        function selectRegion(region) {
+            document.querySelectorAll(".chk-country").forEach(cb => {
+                if (cb.dataset.region === region) cb.checked = true;
+            });
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            document.getElementById("selected-count").innerText = document.querySelectorAll(".chk-country:checked").length;
+        }
+
+        function openCustomChallengeModal() {
+            document.getElementById("custom-modal").classList.remove("hidden");
+            document.getElementById("custom-title").focus();
+        }
+
+        function closeCustomChallengeModal() {
+            document.getElementById("custom-modal").classList.add("hidden");
+        }
+
+        function buildShareUrl(challenge) {
+            const base = `${window.location.origin}${window.location.pathname}`;
+            if (challenge.source === "db" && challenge.id) return `${base}?cId=${challenge.id}`;
+            const { title, type, desc, author, countryIds } = challenge;
+            const encoded = btoa(encodeURIComponent(JSON.stringify({ title, type, desc, author, countryIds })));
+            return `${base}?c=${encoded}`;
+        }
+
+        async function saveAndGenerateChallenge() {
+            const title = document.getElementById("custom-title").value.trim();
+            const type = document.getElementById("custom-type").value;
+            const desc = document.getElementById("custom-desc").value.trim();
+            const author = document.getElementById("custom-author").value.trim();
+            const countryIds = Array.from(document.querySelectorAll(".chk-country:checked")).map(cb => cb.value);
+
+            if (!title) { showToast("Donne un titre à ton challenge."); return; }
+            if (countryIds.length < 2) { showToast("Sélectionne au moins 2 pays."); return; }
+
+            const btn = document.getElementById("save-challenge-btn");
+            btn.disabled = true;
+            btn.classList.add("opacity-60");
+
+            let challenge = { title, type, desc, author, countryIds, createdAt: Date.now(), source: "shared", id: null };
+            let savedInDb = false;
+
+            try {
+                const res = await fetch("/api/challenges", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title, type, desc, author, countryIds })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const clean = sanitizeChallenge(data.challenge);
+                    if (clean) {
+                        challenge = { ...clean, source: "db" };
+                        savedInDb = true;
+                    }
+                }
+            } catch (err) {
+                console.warn("Sauvegarde en base impossible, lien compressé utilisé", err);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove("opacity-60");
+
+            const shareUrl = buildShareUrl(challenge);
+            const copied = await copyText(shareUrl);
+
+            if (savedInDb) {
+                showToast(copied ? "Challenge sauvegardé dans la base. Lien copié !" : "Challenge sauvegardé dans la base.", 4500);
+                window.history.replaceState({}, document.title, `${window.location.pathname}?cId=${challenge.id}`);
+            } else {
+                showToast("Base indisponible : lien autonome créé (non recherchable)." + (copied ? " Lien copié !" : ""), 5500);
+            }
+
+            closeCustomChallengeModal();
+            ["custom-title", "custom-desc", "custom-author"].forEach(id => document.getElementById(id).value = "");
+            selectAllCountries(false);
+            startChallenge(challenge);
+        }
+
+        async function checkUrlForSharedChallenge() {
+            const params = new URLSearchParams(window.location.search);
+            const cDataParam = params.get("c");
+            const cIdParam = params.get("cId");
+
+            if (cDataParam) {
+                try {
+                    const challenge = sanitizeChallenge(JSON.parse(decodeURIComponent(atob(cDataParam))));
+                    if (challenge) {
+                        challenge.source = "shared";
+                        startChallenge(challenge);
+                        return true;
+                    }
+                } catch (e) {
+                    console.error("Lien invalide", e);
+                }
+                showToast("Ce lien de challenge est invalide.");
+            } else if (cIdParam) {
+                try {
+                    const res = await fetch(`/api/challenges?id=${encodeURIComponent(cIdParam)}`, { cache: "no-store" });
+                    if (res.ok) {
+                        const data = await res.json();
+                        const challenge = sanitizeChallenge(data.challenge);
+                        if (challenge) {
+                            challenge.source = "db";
+                            startChallenge(challenge);
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erreur de récupération du challenge", e);
+                }
+                showToast("Challenge introuvable. Chargement du challenge par défaut.");
+            }
+            return false;
+        }
+
+        async function copyCurrentChallengeShareLink() {
+            if (!currentChallenge || currentChallenge.source === "preset") return;
+            const ok = await copyText(buildShareUrl(currentChallenge));
+            showToast(ok ? "Lien du challenge copié !" : "Impossible de copier le lien.");
+        }
+
+        // ======================= TÉLÉPHONE / TABLETTE =======================
+        function setupResponsiveBehavior() {
+            const panel = document.getElementById("map-panel");
+            let resizeTimer = null;
+
+            const refreshMap = () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    if (!map) return;
+                    map.invalidateSize();
+                    if (autoZoom && highlightedLayer) {
+                        const pad = map.getSize().x < 500 ? 20 : 50;
+                        map.fitBounds(highlightedLayer.getBounds(), { padding: [pad, pad], maxZoom: 5, animate: false });
+                    }
+                }, 150);
+            };
+
+            if ("ResizeObserver" in window) new ResizeObserver(refreshMap).observe(panel);
+            window.addEventListener("orientationchange", refreshMap);
+
+            const vv = window.visualViewport;
+            if (vv) {
+                vv.addEventListener("resize", () => {
+                    const keyboardOpen = window.innerWidth < 1024 && vv.scale <= 1.01 && (window.innerHeight - vv.height) > 120;
+                    document.body.classList.toggle("kb-open", keyboardOpen);
+                    document.body.style.height = keyboardOpen ? `${vv.height}px` : "";
+                    if (keyboardOpen) window.scrollTo(0, 0);
+                });
+            }
+        }
+
+        // ======================= CONFIG =======================
+        function openConfigModal() {
+            document.getElementById("carto-key").value = localStorage.getItem("CARTO_API_KEY") || "";
+
+            const carto = document.getElementById("status-carto");
+            if (serverCartoEnabled) {
+                carto.textContent = "Détectée (privée, côté serveur)";
+                carto.className = "font-bold text-emerald-400";
+            } else {
+                carto.textContent = "Non détectée";
+                carto.className = "font-bold text-amber-400";
+            }
+
+            const db = document.getElementById("status-db");
+            if (dbConfigured === true) {
+                db.textContent = "Connectée";
+                db.className = "font-bold text-emerald-400";
+            } else if (dbConfigured === false) {
+                db.textContent = "Non configurée";
+                db.className = "font-bold text-amber-400";
+            } else {
+                db.textContent = "API introuvable";
+                db.className = "font-bold text-rose-400";
+            }
+
+            document.getElementById("config-modal").classList.remove("hidden");
+        }
+
+        function closeConfigModal() {
+            document.getElementById("config-modal").classList.add("hidden");
+        }
+
+        function saveConfig() {
+            const cartoKey = document.getElementById("carto-key").value.trim();
+            if (cartoKey) localStorage.setItem("CARTO_API_KEY", cartoKey);
+            else localStorage.removeItem("CARTO_API_KEY");
+
+            updateMapTileLayer();
+            showToast("Configuration enregistrée !");
+            closeConfigModal();
+        }
+    </script>
+</body>
+</html>
