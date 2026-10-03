@@ -99,9 +99,9 @@
 
     <!-- Top Header Navigation -->
     <header id="app-header" class="bg-slate-900 border-b border-slate-800 px-3 sm:px-4 pb-2 shrink-0 shadow-xl z-20">
-        <div class="max-w-7xl mx-auto flex flex-wrap lg:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
+        <div class="max-w-7xl mx-auto flex flex-wrap xl:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
 
-            <div class="flex items-center gap-2.5 min-w-0 order-1">
+            <div class="flex items-center gap-2.5 min-w-0 order-1 flex-1 xl:flex-none">
                 <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-slate-950 shadow-lg shadow-amber-500/20 shrink-0">
                     <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                 </div>
@@ -114,7 +114,7 @@
             </div>
 
             <!-- Stats Bar -->
-            <div class="order-2 lg:order-3 flex items-center gap-2.5 sm:gap-6 bg-slate-950/80 px-3 sm:px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
+            <div class="order-2 xl:order-3 ml-auto flex items-center gap-2.5 sm:gap-5 bg-slate-950/80 px-3 sm:px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
                 <div class="text-center">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Score</span>
                     <span id="stat-score" class="font-extrabold text-sm sm:text-base text-emerald-400">0%</span>
@@ -132,7 +132,7 @@
             </div>
 
             <!-- Challenge selector & buttons -->
-            <div id="header-actions" class="order-3 lg:order-2 w-full lg:w-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <div id="header-actions" class="order-3 xl:order-2 w-full xl:w-auto xl:flex-1 xl:min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar">
                 <button onclick="openLibrary()" class="shrink-0 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
                     <i data-lucide="search" class="w-4 h-4"></i> Rechercher<span class="hidden sm:inline">&nbsp;un challenge</span>
                 </button>
