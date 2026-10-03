@@ -29,9 +29,12 @@
         } } } } };
     </script>
     <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"
-            onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js';s.onload=function(){if(window.refreshIcons)refreshIcons();};document.head.appendChild(s);"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            integrity="sha384-hJnF5AwidE18GSWTAGHv3ByzzvfNZ1Tcx5y1UUV3WkauuMCEzBJBMSwSt/PUPXnM" crossorigin="anonymous"
+            onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js';s.integrity='sha384-hJnF5AwidE18GSWTAGHv3ByzzvfNZ1Tcx5y1UUV3WkauuMCEzBJBMSwSt/PUPXnM';s.crossOrigin='anonymous';s.onload=function(){if(window.refreshIcons)refreshIcons();};document.head.appendChild(s);"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
     <style>
         /* ======================= THÈMES : sombre / clair, + contraste élevé (option indépendante) ======================= */
         :root, html[data-theme="dark"] {
@@ -1469,8 +1472,16 @@
             [...countriesList].sort((a, b) => a.name.localeCompare(b.name, "fr")).forEach(c => {
                 const label = document.createElement("label");
                 label.className = "flex items-center gap-2 text-slate-300 hover:text-slate-100 cursor-pointer select-none text-[11px]";
-                label.innerHTML = `<input type="checkbox" value="${c.id}" data-region="${c.region}" onchange="updateSelectedCount()" class="chk-country rounded accent-amber-500 bg-slate-900 border-slate-700"> <span class="truncate"></span>`;
-                label.querySelector("span").textContent = c.name;
+                const cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.value = c.id;
+                cb.dataset.region = c.region;
+                cb.className = "chk-country rounded accent-amber-500 bg-slate-900 border-slate-700";
+                cb.addEventListener("change", updateSelectedCount);
+                const span = document.createElement("span");
+                span.className = "truncate";
+                span.textContent = c.name;
+                label.append(cb, " ", span);
                 container.appendChild(label);
             });
         }
