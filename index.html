@@ -8,17 +8,64 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>GeoMaster - Challenges & Cartes Personnalisées</title>
+    <script>(function(){var t=null;try{t=localStorage.getItem("THEME")}catch(e){}
+        if(!t){t=matchMedia("(prefers-contrast: more)").matches?"hc":(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}
+        document.documentElement.dataset.theme=t;})();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { slate: {
+            100: "rgb(var(--s100) / <alpha-value>)", 200: "rgb(var(--s200) / <alpha-value>)",
+            300: "rgb(var(--s300) / <alpha-value>)", 400: "rgb(var(--s400) / <alpha-value>)",
+            500: "rgb(var(--s500) / <alpha-value>)", 600: "rgb(var(--s600) / <alpha-value>)",
+            700: "rgb(var(--s700) / <alpha-value>)", 800: "rgb(var(--s800) / <alpha-value>)",
+            900: "rgb(var(--s900) / <alpha-value>)", 950: "rgb(var(--s950) / <alpha-value>)"
+        } } } } };
+    </script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #090d16; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        /* ======================= THÈMES ======================= */
+        :root, html[data-theme="dark"] {
+            --s100: 241 245 249; --s200: 226 232 240; --s300: 203 213 225; --s400: 148 163 184; --s500: 100 116 139;
+            --s600: 71 85 105; --s700: 51 65 85; --s800: 30 41 59; --s900: 15 23 42; --s950: 2 6 23;
+            --map-bg: 11 15 25; color-scheme: dark;
+        }
+        html[data-theme="light"] {
+            --s100: 15 23 42; --s200: 30 41 59; --s300: 51 65 85; --s400: 71 85 105; --s500: 100 116 139;
+            --s600: 148 163 184; --s700: 203 213 225; --s800: 226 232 240; --s900: 255 255 255; --s950: 241 245 249;
+            --map-bg: 236 240 245; color-scheme: light;
+        }
+        html[data-theme="hc"] {
+            --s100: 255 255 255; --s200: 255 255 255; --s300: 255 255 255; --s400: 240 240 240; --s500: 225 225 225;
+            --s600: 200 200 200; --s700: 255 255 255; --s800: 55 55 55; --s900: 0 0 0; --s950: 0 0 0;
+            --map-bg: 0 0 0; color-scheme: dark;
+        }
 
-        #map { background-color: #0b0f19; z-index: 1; }
+        /* Clair : fond de carte inversé + textes colorés plus foncés pour rester lisibles */
+        html[data-theme="light"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.97) contrast(0.92); }
+        html[data-theme="light"] .text-amber-300, html[data-theme="light"] .text-amber-400 { color: #b45309; }
+        html[data-theme="light"] .text-emerald-400 { color: #047857; }
+        html[data-theme="light"] .text-rose-400 { color: #be123c; }
+        html[data-theme="light"] #stat-progress { color: #4338ca; }
+
+        /* Contraste élevé : bordures blanches, couleurs vives, carte plus nette */
+        html[data-theme="hc"] .leaflet-tile-pane { filter: brightness(1.7) contrast(1.9); }
+        html[data-theme="hc"] .border-slate-800 { border-color: #ffffff !important; }
+        html[data-theme="hc"] #map-panel { border-color: #ffffff; }
+        html[data-theme="hc"] .text-amber-300, html[data-theme="hc"] .text-amber-400 { color: #ffd60a; }
+        html[data-theme="hc"] .text-emerald-400 { color: #4ade80; }
+        html[data-theme="hc"] .text-rose-400 { color: #ff6b81; }
+        html[data-theme="hc"] .text-indigo-400, html[data-theme="hc"] .text-indigo-300 { color: #a5b4fc; }
+        html[data-theme="hc"] button:focus-visible, html[data-theme="hc"] input:focus-visible,
+        html[data-theme="hc"] select:focus-visible { outline: 3px solid #ffd60a; outline-offset: 2px; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgb(var(--s950)); }
+        ::-webkit-scrollbar-thumb { background: rgb(var(--s700)); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgb(var(--s600)); }
+
+        #map { background-color: rgb(var(--map-bg)); z-index: 1; }
 
         .highlighted-country {
             fill: #f59e0b !important;
@@ -59,7 +106,7 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
         #workspace { display: flex; flex-direction: column; }
-        #map-panel { position: relative; flex: 0 0 40%; min-height: 180px; border-bottom: 1px solid #1e293b; }
+        #map-panel { position: relative; flex: 0 0 40%; min-height: 180px; border-bottom: 1px solid rgb(var(--s800)); }
         #side-panel { flex: 1 1 0; min-height: 0; }
 
         @media (min-width: 768px) and (orientation: portrait) {
@@ -67,7 +114,7 @@
         }
         @media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
             #workspace { flex-direction: row; }
-            #map-panel { flex: 0 0 58%; min-height: 0; border-bottom: 0; border-right: 1px solid #1e293b; }
+            #map-panel { flex: 0 0 58%; min-height: 0; border-bottom: 0; border-right: 1px solid rgb(var(--s800)); }
         }
         @media (min-width: 1280px) {
             #map-panel { flex-basis: 66.6667%; }
@@ -102,11 +149,11 @@
         <div class="max-w-7xl mx-auto flex flex-wrap xl:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
 
             <div class="flex items-center gap-2.5 min-w-0 order-1 flex-1 xl:flex-none">
-                <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-slate-950 shadow-lg shadow-amber-500/20 shrink-0">
+                <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-[#0f172a] shadow-lg shadow-amber-500/20 shrink-0">
                     <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                 </div>
                 <div class="min-w-0">
-                    <h1 class="font-black text-base sm:text-lg tracking-tight text-white flex items-center gap-2">
+                    <h1 class="font-black text-base sm:text-lg tracking-tight text-slate-100 flex items-center gap-2">
                         GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30 whitespace-nowrap">Mode Pays</span>
                     </h1>
                     <p id="mode-subtitle" class="hidden sm:block hide-on-short text-xs text-slate-400 truncate">Trouve le pays ou la capitale du pays surligné (4 essais)</p>
@@ -140,9 +187,11 @@
                 <select id="preset-select" onchange="onPresetChange()" class="shrink-0 bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[200px] sm:max-w-[220px]">
                 </select>
 
-                <button onclick="openCustomChallengeModal()" class="shrink-0 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                <button onclick="openCustomChallengeModal()" class="shrink-0 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#0f172a] font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer<span class="hidden sm:inline">&nbsp;un challenge</span>
                 </button>
+
+                <button id="theme-btn" onclick="cycleTheme()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Changer de thème" aria-label="Changer de thème"></button>
 
                 <button onclick="openConfigModal()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration" aria-label="Configuration">
                     <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> <span class="hidden sm:inline">Config</span>
@@ -206,9 +255,9 @@
 
                 <form onsubmit="handleTypeSubmit(event)" class="relative">
                     <input type="text" id="type-input" placeholder="Tape ta réponse..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"
-                           class="w-full bg-slate-950 border-2 border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-3 pl-10 text-sm font-medium focus:border-amber-500 focus:outline-none transition shadow-inner">
+                           class="w-full bg-slate-950 border-2 border-slate-700 text-slate-100 placeholder-slate-500 rounded-xl px-4 py-3 pl-10 text-sm font-medium focus:border-amber-500 focus:outline-none transition shadow-inner">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
-                    <button type="submit" class="absolute right-2 top-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-md transition active:scale-95">
+                    <button type="submit" class="absolute right-2 top-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#0f172a] font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-md transition active:scale-95">
                         Valider
                     </button>
                 </form>
@@ -251,7 +300,7 @@
                 <div class="flex items-center gap-2 text-indigo-300 font-bold text-base">
                     <i data-lucide="library" class="w-5 h-5"></i> Bibliothèque de challenges
                 </div>
-                <button onclick="closeLibrary()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                <button onclick="closeLibrary()" class="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -259,7 +308,7 @@
             <div class="p-4 border-b border-slate-800 space-y-3 shrink-0">
                 <div class="relative">
                     <input type="text" id="lib-search" oninput="onLibrarySearchInput()" placeholder="Cherche par titre, description ou auteur..." autocomplete="off"
-                           class="w-full bg-slate-950 border-2 border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-2.5 pl-10 text-sm font-medium focus:border-indigo-500 focus:outline-none transition">
+                           class="w-full bg-slate-950 border-2 border-slate-700 text-slate-100 placeholder-slate-500 rounded-xl px-4 py-2.5 pl-10 text-sm font-medium focus:border-indigo-500 focus:outline-none transition">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
                 </div>
                 <div class="flex items-center gap-2 text-xs" id="lib-type-filters">
@@ -282,7 +331,7 @@
                 <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
                     <i data-lucide="plus-circle" class="w-5 h-5"></i> Créer un challenge personnalisé
                 </div>
-                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -333,10 +382,10 @@
             </div>
 
             <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex flex-wrap justify-end gap-2 sm:gap-3 shrink-0">
-                <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
+                <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 font-semibold transition">
                     Annuler
                 </button>
-                <button id="save-challenge-btn" onclick="saveAndGenerateChallenge()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-5 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                <button id="save-challenge-btn" onclick="saveAndGenerateChallenge()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#0f172a] font-bold px-5 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
                     <i data-lucide="share-2" class="w-4 h-4"></i> Sauvegarder et obtenir le lien
                 </button>
             </div>
@@ -351,7 +400,7 @@
                 <div class="flex items-center gap-2 text-emerald-400 font-bold text-base">
                     <i data-lucide="settings" class="w-5 h-5"></i> Configuration
                 </div>
-                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -380,7 +429,7 @@
             </div>
 
             <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex flex-wrap justify-end gap-2 sm:gap-3 shrink-0">
-                <button onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
+                <button onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 font-semibold transition">
                     Fermer
                 </button>
                 <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
@@ -561,11 +610,21 @@
         const MAX_ATTEMPTS = 4;
         const POINTS = [1, 2 / 3, 1 / 3, 1 / 3];   // réussite au 1er, 2e, 3e, 4e essai
         const RESULT_STYLES = {
-            white: { fill: "#ffffff", btn: "bg-white text-slate-900 border-white" },
-            light: { fill: "#fde68a", btn: "bg-yellow-200 text-slate-900 border-yellow-200" },
+            white: { fill: "#ffffff", btn: "bg-white text-[#0f172a] border-slate-400" },
+            light: { fill: "#fde68a", btn: "bg-yellow-200 text-[#0f172a] border-yellow-200" },
             dark:  { fill: "#ca8a04", btn: "bg-yellow-600 text-white border-yellow-600" },
             red:   { fill: "#dc2626", btn: "bg-red-600 text-white border-red-600" }
         };
+
+        // Contour des pays colorés selon le thème (pour que le blanc reste visible en mode clair)
+        function resultStyle(state) {
+            const t = document.documentElement.dataset.theme;
+            return {
+                fillColor: RESULT_STYLES[state].fill, fillOpacity: 0.92,
+                color: t === "light" ? "#0f172a" : t === "hc" ? "#000000" : "#64748b",
+                weight: t === "dark" ? 1 : 1.6
+            };
+        }
 
         let serverCartoEnabled = false;
         let dbConfigured = null;
@@ -631,11 +690,35 @@
             };
         }
 
+        // ======================= THÈMES =======================
+        const THEMES = [
+            { key: "dark",  label: "Sombre",   icon: "moon",     meta: "#0f172a" },
+            { key: "light", label: "Clair",    icon: "sun",      meta: "#f1f5f9" },
+            { key: "hc",    label: "Contraste", icon: "contrast", meta: "#000000" }
+        ];
+
+        function applyTheme(key, save = true) {
+            const theme = THEMES.find(t => t.key === key) || THEMES[0];
+            document.documentElement.dataset.theme = theme.key;
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", theme.meta);
+            const btn = document.getElementById("theme-btn");
+            btn.innerHTML = `<i data-lucide="${theme.icon}" class="w-4 h-4 text-emerald-400"></i><span class="hidden sm:inline">${theme.label}</span>`;
+            lucide.createIcons();
+            if (save) { try { localStorage.setItem("THEME", theme.key); } catch (e) {} }
+            repaintResults();   // redessine les contours des pays colorés
+        }
+
+        function cycleTheme() {
+            const current = THEMES.findIndex(t => t.key === document.documentElement.dataset.theme);
+            applyTheme(THEMES[(current + 1) % THEMES.length].key);
+        }
+
         // ======================= INITIALISATION =======================
         document.addEventListener("DOMContentLoaded", async () => {
             buildPresetSelect();
             populateChecklist();
             lucide.createIcons();
+            applyTheme(document.documentElement.dataset.theme, false);
 
             await fetchServerConfig();
             initMap();
@@ -877,7 +960,7 @@
             const feature = findFeature(country);
             if (!feature) return;
             L.geoJSON(feature, {
-                style: { fillColor: RESULT_STYLES[state].fill, fillOpacity: 0.9, color: "#64748b", weight: 1 },
+                style: resultStyle(state),
                 interactive: false
             }).addTo(resultGroup);
         }
@@ -890,7 +973,7 @@
                 const feature = findFeature(countryById[id]);
                 if (!feature) return;
                 L.geoJSON(feature, {
-                    style: { fillColor: RESULT_STYLES[state].fill, fillOpacity: 0.9, color: "#64748b", weight: 1 },
+                    style: resultStyle(state),
                     interactive: false
                 }).addTo(resultGroup);
             });
@@ -1178,7 +1261,7 @@
                 card.onclick = () => playLibraryItem(offset + i);
 
                 const info = el("div", "min-w-0");
-                info.appendChild(el("div", "font-bold text-sm text-white truncate", c.title));
+                info.appendChild(el("div", "font-bold text-sm text-slate-100 truncate", c.title));
 
                 const meta = [
                     c.type === "CAPITAL" ? "Capitales" : "Pays",
@@ -1218,7 +1301,7 @@
 
             [...countriesList].sort((a, b) => a.name.localeCompare(b.name, "fr")).forEach(c => {
                 const label = document.createElement("label");
-                label.className = "flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer select-none text-[11px]";
+                label.className = "flex items-center gap-2 text-slate-300 hover:text-slate-100 cursor-pointer select-none text-[11px]";
                 label.innerHTML = `<input type="checkbox" value="${c.id}" data-region="${c.region}" onchange="updateSelectedCount()" class="chk-country rounded accent-amber-500 bg-slate-900 border-slate-700"> <span class="truncate"></span>`;
                 label.querySelector("span").textContent = c.name;
                 container.appendChild(label);
