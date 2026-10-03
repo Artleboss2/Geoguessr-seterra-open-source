@@ -50,7 +50,7 @@
         html[data-theme="light"] #stat-progress { color: #4338ca; }
 
         /* Contraste élevé : bordures blanches, couleurs vives, carte plus nette */
-        html[data-theme="hc"] .leaflet-tile-pane { filter: brightness(1.7) contrast(1.9); }
+        html[data-theme="hc"] .leaflet-tile-pane { filter: brightness(0.75) contrast(1.3); }
         html[data-theme="hc"] .border-slate-800 { border-color: #ffffff !important; }
         html[data-theme="hc"] #map-panel { border-color: #ffffff; }
         html[data-theme="hc"] .text-amber-300, html[data-theme="hc"] .text-amber-400 { color: #ffd60a; }
@@ -146,9 +146,9 @@
 
     <!-- Top Header Navigation -->
     <header id="app-header" class="bg-slate-900 border-b border-slate-800 px-3 sm:px-4 pb-2 shrink-0 shadow-xl z-20">
-        <div class="max-w-7xl mx-auto flex flex-wrap xl:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
+        <div class="w-full flex flex-wrap 2xl:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
 
-            <div class="flex items-center gap-2.5 min-w-0 order-1 flex-1 xl:flex-none">
+            <div class="flex items-center gap-2.5 min-w-0 order-1 flex-1 2xl:flex-none">
                 <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-[#0f172a] shadow-lg shadow-amber-500/20 shrink-0">
                     <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                 </div>
@@ -161,7 +161,7 @@
             </div>
 
             <!-- Stats Bar -->
-            <div class="order-2 xl:order-3 ml-auto flex items-center gap-2.5 sm:gap-5 bg-slate-950/80 px-3 sm:px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
+            <div class="order-2 2xl:order-3 ml-auto flex items-center gap-2.5 sm:gap-5 bg-slate-950/80 px-3 sm:px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
                 <div class="text-center">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Score</span>
                     <span id="stat-score" class="font-extrabold text-sm sm:text-base text-emerald-400">0%</span>
@@ -179,7 +179,7 @@
             </div>
 
             <!-- Challenge selector & buttons -->
-            <div id="header-actions" class="order-3 xl:order-2 w-full xl:w-auto xl:flex-1 xl:min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <div id="header-actions" class="order-3 2xl:order-2 w-full 2xl:w-auto 2xl:flex-1 2xl:min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible 2xl:flex-nowrap 2xl:justify-center">
                 <button onclick="openLibrary()" class="shrink-0 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
                     <i data-lucide="search" class="w-4 h-4"></i> Rechercher<span class="hidden sm:inline">&nbsp;un challenge</span>
                 </button>
@@ -590,6 +590,7 @@
         let map;
         let tileLayerInstance = null;
         let highlightedLayer = null;
+        let bordersLayer = null;         // frontières blanches (mode contraste)
         let resultGroup = null;          // couches colorées permanentes (résultats)
         let worldGeoData = null;
 
@@ -705,6 +706,7 @@
             btn.innerHTML = `<i data-lucide="${theme.icon}" class="w-4 h-4 text-emerald-400"></i><span class="hidden sm:inline">${theme.label}</span>`;
             lucide.createIcons();
             if (save) { try { localStorage.setItem("THEME", theme.key); } catch (e) {} }
+            updateBorders();
             repaintResults();   // redessine les contours des pays colorés
         }
 
@@ -758,6 +760,9 @@
             L.control.zoom({ position: "topright" }).addTo(map);
 
             updateMapTileLayer();
+            map.createPane("borders");
+            map.getPane("borders").style.zIndex = 450;
+            map.getPane("borders").style.pointerEvents = "none";
             resultGroup = L.layerGroup().addTo(map);
 
             fetch("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
@@ -765,6 +770,7 @@
                 .then(data => {
                     worldGeoData = data;
                     repaintResults();
+                    updateBorders();
                     if (currentTarget) highlightTargetOnMap(currentTarget);
                 })
                 .catch(err => {
@@ -977,6 +983,18 @@
                     interactive: false
                 }).addTo(resultGroup);
             });
+        }
+
+        // Mode contraste élevé : contours de tous les pays en blanc épais, par-dessus la carte
+        function updateBorders() {
+            if (!map) return;
+            if (bordersLayer) { map.removeLayer(bordersLayer); bordersLayer = null; }
+            if (document.documentElement.dataset.theme !== "hc" || !worldGeoData) return;
+            bordersLayer = L.geoJSON(worldGeoData, {
+                pane: "borders",
+                interactive: false,
+                style: { fill: false, color: "#ffffff", weight: 1.6, opacity: 1 }
+            }).addTo(map);
         }
 
         function toggleAutoZoom() {
