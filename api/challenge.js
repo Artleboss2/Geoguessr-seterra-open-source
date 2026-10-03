@@ -9,15 +9,17 @@
 
 const crypto = require('crypto');
 
-const KV_URL =
-  process.env.KV_REST_API_URL ||
-  process.env.VERCEL_KV_REST_API_URL ||
-  process.env.UPSTASH_REDIS_REST_URL;
+// Vercel permet de choisir un préfixe personnalisé (ex: STORAGE_KV_REST_API_URL).
+// On cherche donc toute variable qui se termine par le bon suffixe.
+function findEnv(...suffixes) {
+  const key = Object.keys(process.env).find(
+    k => process.env[k] && suffixes.some(s => k.endsWith(s))
+  );
+  return key ? process.env[key] : undefined;
+}
 
-const KV_TOKEN =
-  process.env.KV_REST_API_TOKEN ||
-  process.env.VERCEL_KV_REST_API_TOKEN ||
-  process.env.UPSTASH_REDIS_REST_TOKEN;
+const KV_URL = findEnv('REST_API_URL', 'REST_URL');
+const KV_TOKEN = findEnv('REST_API_TOKEN', 'REST_TOKEN');
 
 const INDEX_KEY = 'challenges:index';
 const MAX_RESULTS = 100;
