@@ -690,6 +690,10 @@
                 });
         }
 
+        // Tuiles Carto limitées au zoom 3 : au-delà, la carte est agrandie (moins précise)
+        // et les frontières d'États / détails n'apparaissent plus, seulement les pays.
+        const TILE_NATIVE_ZOOM = 3;
+
         function updateMapTileLayer() {
             if (tileLayerInstance) map.removeLayer(tileLayerInstance);
 
@@ -697,14 +701,14 @@
             let tileUrl, options;
 
             if (serverCartoEnabled) {
-                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}&v=5";
-                options = { attribution: "&copy; OpenStreetMap, CARTO", maxZoom: 19 };
+                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}&v=6";
+                options = { attribution: "&copy; OpenStreetMap, CARTO", maxZoom: 19, maxNativeZoom: TILE_NATIVE_ZOOM };
             } else if (localKey) {
                 tileUrl = `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(localKey)}`;
-                options = { attribution: "&copy; OpenStreetMap, CARTO", subdomains: "abcd", maxZoom: 19 };
+                options = { attribution: "&copy; OpenStreetMap, CARTO", subdomains: "abcd", maxZoom: 19, maxNativeZoom: TILE_NATIVE_ZOOM };
             } else {
                 tileUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-                options = { attribution: "Tiles &copy; Esri", maxZoom: 16 };
+                options = { attribution: "Tiles &copy; Esri", maxZoom: 16, maxNativeZoom: TILE_NATIVE_ZOOM };
             }
 
             tileLayerInstance = L.tileLayer(tileUrl, options).addTo(map);
