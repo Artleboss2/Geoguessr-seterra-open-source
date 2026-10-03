@@ -8,9 +8,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>GeoMaster - Challenges & Cartes Personnalisées</title>
-    <script>(function(){var t=null;try{t=localStorage.getItem("THEME")}catch(e){}
-        if(!t){t=matchMedia("(prefers-contrast: more)").matches?"hc":(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}
-        document.documentElement.dataset.theme=t;})();</script>
+    <script>(function(){
+        var t=null,h=null;
+        try{t=localStorage.getItem("GM_THEME");h=localStorage.getItem("GM_HC");}catch(e){}
+        if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";}
+        document.documentElement.dataset.theme=t;
+        document.documentElement.dataset.hc=(h==="1")?"on":"off";
+    })();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { theme: { extend: { colors: { slate: {
@@ -25,7 +29,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* ======================= THÈMES ======================= */
+        /* ======================= THÈMES : sombre / clair, + contraste élevé (option indépendante) ======================= */
         :root, html[data-theme="dark"] {
             --s100: 241 245 249; --s200: 226 232 240; --s300: 203 213 225; --s400: 148 163 184; --s500: 100 116 139;
             --s600: 71 85 105; --s700: 51 65 85; --s800: 30 41 59; --s900: 15 23 42; --s950: 2 6 23;
@@ -36,29 +40,49 @@
             --s600: 148 163 184; --s700: 203 213 225; --s800: 226 232 240; --s900: 255 255 255; --s950: 241 245 249;
             --map-bg: 236 240 245; color-scheme: light;
         }
-        html[data-theme="hc"] {
+        html[data-theme="dark"][data-hc="on"] {
             --s100: 255 255 255; --s200: 255 255 255; --s300: 255 255 255; --s400: 240 240 240; --s500: 225 225 225;
             --s600: 200 200 200; --s700: 255 255 255; --s800: 55 55 55; --s900: 0 0 0; --s950: 0 0 0;
-            --map-bg: 0 0 0; color-scheme: dark;
+            --map-bg: 0 0 0;
+        }
+        html[data-theme="light"][data-hc="on"] {
+            --s100: 0 0 0; --s200: 0 0 0; --s300: 0 0 0; --s400: 20 20 20; --s500: 45 45 45;
+            --s600: 90 90 90; --s700: 0 0 0; --s800: 225 225 225; --s900: 255 255 255; --s950: 255 255 255;
+            --map-bg: 255 255 255;
         }
 
-        /* Clair : fond de carte inversé + textes colorés plus foncés pour rester lisibles */
+        /* Clair : fond de carte inversé + textes colorés plus foncés */
         html[data-theme="light"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.97) contrast(0.92); }
         html[data-theme="light"] .text-amber-300, html[data-theme="light"] .text-amber-400 { color: #b45309; }
         html[data-theme="light"] .text-emerald-400 { color: #047857; }
         html[data-theme="light"] .text-rose-400 { color: #be123c; }
         html[data-theme="light"] #stat-progress { color: #4338ca; }
 
-        /* Contraste élevé : bordures blanches, couleurs vives, carte plus nette */
-        html[data-theme="hc"] .leaflet-tile-pane { filter: brightness(0.75) contrast(1.3); }
-        html[data-theme="hc"] .border-slate-800 { border-color: #ffffff !important; }
-        html[data-theme="hc"] #map-panel { border-color: #ffffff; }
-        html[data-theme="hc"] .text-amber-300, html[data-theme="hc"] .text-amber-400 { color: #ffd60a; }
-        html[data-theme="hc"] .text-emerald-400 { color: #4ade80; }
-        html[data-theme="hc"] .text-rose-400 { color: #ff6b81; }
-        html[data-theme="hc"] .text-indigo-400, html[data-theme="hc"] .text-indigo-300 { color: #a5b4fc; }
-        html[data-theme="hc"] button:focus-visible, html[data-theme="hc"] input:focus-visible,
-        html[data-theme="hc"] select:focus-visible { outline: 3px solid #ffd60a; outline-offset: 2px; }
+        /* Contraste élevé sur fond sombre */
+        html[data-theme="dark"][data-hc="on"] .leaflet-tile-pane { filter: brightness(0.75) contrast(1.3); }
+        html[data-theme="dark"][data-hc="on"] .border-slate-800, html[data-theme="dark"][data-hc="on"] #map-panel { border-color: #ffffff !important; }
+        html[data-theme="dark"][data-hc="on"] .text-amber-300, html[data-theme="dark"][data-hc="on"] .text-amber-400 { color: #ffd60a; }
+        html[data-theme="dark"][data-hc="on"] .text-emerald-400 { color: #4ade80; }
+        html[data-theme="dark"][data-hc="on"] .text-rose-400 { color: #ff6b81; }
+        html[data-theme="dark"][data-hc="on"] .text-indigo-400, html[data-theme="dark"][data-hc="on"] .text-indigo-300 { color: #a5b4fc; }
+        html[data-theme="dark"][data-hc="on"] button:focus-visible, html[data-theme="dark"][data-hc="on"] input:focus-visible,
+        html[data-theme="dark"][data-hc="on"] select:focus-visible { outline: 3px solid #ffd60a; outline-offset: 2px; }
+
+        /* Contraste élevé sur fond clair */
+        html[data-theme="light"][data-hc="on"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(1.08) contrast(1.35); }
+        html[data-theme="light"][data-hc="on"] .border-slate-800, html[data-theme="light"][data-hc="on"] #map-panel { border-color: #000000 !important; }
+        html[data-theme="light"][data-hc="on"] .text-amber-300, html[data-theme="light"][data-hc="on"] .text-amber-400 { color: #7c2d12; }
+        html[data-theme="light"][data-hc="on"] .text-emerald-400 { color: #065f46; }
+        html[data-theme="light"][data-hc="on"] .text-rose-400 { color: #9f1239; }
+        html[data-theme="light"][data-hc="on"] #stat-progress { color: #312e81; }
+        html[data-theme="light"][data-hc="on"] button:focus-visible, html[data-theme="light"][data-hc="on"] input:focus-visible,
+        html[data-theme="light"][data-hc="on"] select:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+
+        /* Bouton contraste élevé (on / off) */
+        #hc-btn { width: 34px; height: 34px; min-height: 0 !important; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+            background: rgb(var(--s800)); border: 1px solid rgb(var(--s700)); color: rgb(var(--s400)); transition: background .25s, color .25s; }
+        #hc-btn[aria-pressed="true"] { background: #f59e0b; border-color: #f59e0b; color: #0f172a; }
+        @media (pointer: coarse) and (min-width: 640px) { #hc-btn { width: 40px; height: 40px; } }
 
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: rgb(var(--s950)); }
@@ -112,7 +136,7 @@
             display: flex; align-items: center; justify-content: center; border-radius: 999px;
             color: rgb(var(--s400)); transition: color .25s; }
         #theme-toggle .theme-opt[aria-checked="true"] { color: #0f172a; }
-        @media (pointer: coarse) { #theme-toggle { --slot: 34px; } }
+        @media (pointer: coarse) and (min-width: 640px) { #theme-toggle { --slot: 34px; } }
         @media (prefers-reduced-motion: reduce) { #theme-thumb { transition: none; } }
 
         .no-scrollbar { scrollbar-width: none; }
@@ -161,7 +185,7 @@
     <header id="app-header" class="bg-slate-900 border-b border-slate-800 px-3 sm:px-4 pb-2 shrink-0 shadow-xl z-20">
         <div class="w-full flex flex-wrap 2xl:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
 
-            <div class="flex items-center gap-2.5 min-w-0 order-1 flex-1 2xl:flex-none">
+            <div class="hidden sm:flex items-center gap-2.5 min-w-0 order-1 flex-1 2xl:flex-none">
                 <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-[#0f172a] shadow-lg shadow-amber-500/20 shrink-0">
                     <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                 </div>
@@ -174,44 +198,45 @@
             </div>
 
             <!-- Stats Bar -->
-            <div class="order-2 2xl:order-3 ml-auto flex items-center gap-2.5 sm:gap-5 bg-slate-950/80 px-3 sm:px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
+            <div class="order-2 2xl:order-3 ml-auto flex items-center gap-1.5 sm:gap-5 bg-slate-950/80 px-2 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
                 <div class="text-center">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Score</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Score</span>
                     <span id="stat-score" class="font-extrabold text-sm sm:text-base text-emerald-400">0%</span>
                 </div>
                 <div class="w-px h-5 bg-slate-800"></div>
                 <div class="text-center">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Série</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Série</span>
                     <span id="stat-streak" class="font-extrabold text-sm sm:text-base text-amber-400">0 🔥</span>
                 </div>
                 <div class="w-px h-5 bg-slate-800"></div>
                 <div class="text-center">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progression</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Progression</span>
                     <span id="stat-progress" class="font-extrabold text-sm sm:text-base text-indigo-400 whitespace-nowrap">0 / 0</span>
                 </div>
             </div>
 
             <!-- Challenge selector & buttons -->
-            <div id="header-actions" class="order-3 2xl:order-2 w-full 2xl:w-auto 2xl:flex-1 2xl:min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible 2xl:flex-nowrap 2xl:justify-center">
-                <button onclick="openLibrary()" class="shrink-0 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
-                    <i data-lucide="search" class="w-4 h-4"></i> Rechercher<span class="hidden sm:inline">&nbsp;un challenge</span>
+            <div id="header-actions" class="order-1 sm:order-3 2xl:order-2 flex-1 min-w-0 sm:flex-none sm:w-full 2xl:w-auto 2xl:flex-1 2xl:min-w-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible 2xl:flex-nowrap 2xl:justify-center">
+                <button onclick="openLibrary()" aria-label="Rechercher un challenge" title="Rechercher un challenge" class="shrink-0 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-2.5 sm:px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="search" class="w-4 h-4"></i><span class="hidden sm:inline">Rechercher un challenge</span>
                 </button>
 
-                <select id="preset-select" onchange="onPresetChange()" class="shrink-0 bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[200px] sm:max-w-[220px]">
+                <select id="preset-select" onchange="onPresetChange()" class="hidden sm:block shrink-0 bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[200px] sm:max-w-[220px]">
                 </select>
 
-                <button onclick="openCustomChallengeModal()" class="shrink-0 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#0f172a] font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer<span class="hidden sm:inline">&nbsp;un challenge</span>
+                <button onclick="openCustomChallengeModal()" aria-label="Créer un challenge" title="Créer un challenge" class="shrink-0 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#0f172a] font-bold px-2.5 sm:px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Créer un challenge</span>
                 </button>
 
                 <div id="theme-toggle" role="radiogroup" aria-label="Thème d'affichage" class="shrink-0">
                     <span id="theme-thumb" aria-hidden="true"></span>
-                    <button type="button" role="radio" data-theme-key="dark" onclick="applyTheme('dark')" title="Thème sombre" aria-label="Thème sombre" class="theme-opt"><i data-lucide="moon" class="w-3.5 h-3.5"></i></button>
-                    <button type="button" role="radio" data-theme-key="light" onclick="applyTheme('light')" title="Thème clair" aria-label="Thème clair" class="theme-opt"><i data-lucide="sun" class="w-3.5 h-3.5"></i></button>
-                    <button type="button" role="radio" data-theme-key="hc" onclick="applyTheme('hc')" title="Contraste élevé" aria-label="Contraste élevé" class="theme-opt"><i data-lucide="contrast" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" role="radio" data-theme-key="dark" onclick="setTheme('dark')" title="Thème sombre" aria-label="Thème sombre" class="theme-opt"><i data-lucide="moon" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" role="radio" data-theme-key="light" onclick="setTheme('light')" title="Thème clair" aria-label="Thème clair" class="theme-opt"><i data-lucide="sun" class="w-3.5 h-3.5"></i></button>
                 </div>
 
-                <button onclick="openConfigModal()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration" aria-label="Configuration">
+                <button id="hc-btn" type="button" onclick="toggleContrast()" aria-pressed="false" title="Contraste élevé" aria-label="Contraste élevé" class="shrink-0"><i data-lucide="contrast" class="w-4 h-4"></i></button>
+
+                <button onclick="openConfigModal()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 sm:px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration" aria-label="Configuration">
                     <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> <span class="hidden sm:inline">Config</span>
                 </button>
             </div>
@@ -637,11 +662,12 @@
 
         // Contour des pays colorés selon le thème (pour que le blanc reste visible en mode clair)
         function resultStyle(state) {
-            const t = document.documentElement.dataset.theme;
+            const { theme, hc } = getAppearance();
+            const light = theme === "light";
             return {
                 fillColor: RESULT_STYLES[state].fill, fillOpacity: 0.92,
-                color: t === "light" ? "#0f172a" : t === "hc" ? "#000000" : "#64748b",
-                weight: t === "dark" ? 1 : 1.6
+                color: light ? "#0f172a" : (hc ? "#000000" : "#64748b"),
+                weight: (light || hc) ? 1.6 : 1
             };
         }
 
@@ -710,31 +736,44 @@
         }
 
         // ======================= THÈMES =======================
-        const THEMES = [
-            { key: "dark",  label: "Sombre",   icon: "moon",     meta: "#0f172a" },
-            { key: "light", label: "Clair",    icon: "sun",      meta: "#f1f5f9" },
-            { key: "hc",    label: "Contraste", icon: "contrast", meta: "#000000" }
-        ];
+        // Deux réglages indépendants : thème (sombre / clair) et contraste élevé (on / off)
+        function getAppearance() {
+            const d = document.documentElement.dataset;
+            return { theme: d.theme === "light" ? "light" : "dark", hc: d.hc === "on" };
+        }
 
-        function applyTheme(key, save = true) {
-            const theme = THEMES.find(t => t.key === key) || THEMES[0];
-            document.documentElement.dataset.theme = theme.key;
-            document.querySelector('meta[name="theme-color"]').setAttribute("content", theme.meta);
-            document.getElementById("theme-toggle").style.setProperty("--i", THEMES.indexOf(theme));
+        function applyAppearance(theme, hc, save = true) {
+            const html = document.documentElement;
+            html.dataset.theme = theme;
+            html.dataset.hc = hc ? "on" : "off";
+
+            const metaColor = hc ? (theme === "light" ? "#ffffff" : "#000000") : (theme === "light" ? "#f1f5f9" : "#0f172a");
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", metaColor);
+
+            document.getElementById("theme-toggle").style.setProperty("--i", theme === "light" ? 1 : 0);
             document.querySelectorAll(".theme-opt").forEach(btn =>
-                btn.setAttribute("aria-checked", btn.dataset.themeKey === theme.key));
-            lucide.createIcons();
-            if (save) { try { localStorage.setItem("THEME", theme.key); } catch (e) {} }
+                btn.setAttribute("aria-checked", btn.dataset.themeKey === theme));
+            document.getElementById("hc-btn").setAttribute("aria-pressed", hc);
+
+            if (save) {
+                try {
+                    localStorage.setItem("GM_THEME", theme);
+                    localStorage.setItem("GM_HC", hc ? "1" : "0");
+                } catch (e) {}
+            }
             updateBorders();
             repaintResults();   // redessine les contours des pays colorés
         }
+
+        function setTheme(theme) { applyAppearance(theme, getAppearance().hc); }
+        function toggleContrast() { const a = getAppearance(); applyAppearance(a.theme, !a.hc); }
 
         // ======================= INITIALISATION =======================
         document.addEventListener("DOMContentLoaded", async () => {
             buildPresetSelect();
             populateChecklist();
             lucide.createIcons();
-            applyTheme(document.documentElement.dataset.theme, false);
+            { const a = getAppearance(); applyAppearance(a.theme, a.hc, false); }
 
             await fetchServerConfig();
             initMap();
@@ -967,9 +1006,35 @@
 
             highlightedLayer = L.geoJSON(feature, { style: { className: "highlighted-country" } }).addTo(map);
 
-            if (autoZoom) {
-                const pad = map.getSize().x < 500 ? 20 : 50;
-                map.fitBounds(highlightedLayer.getBounds(), { padding: [pad, pad], maxZoom: 5, animate: true, duration: 0.8 });
+            if (autoZoom) moveToBounds(highlightedLayer.getBounds());
+        }
+        }
+
+        // Transition entre deux pays : dézoom, déplacement, puis rezoom sur la cible
+        let flyToken = 0;
+        function moveToBounds(bounds) {
+            const pad = map.getSize().x < 500 ? 20 : 50;
+            const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (reduceMotion) {
+                map.fitBounds(bounds, { padding: [pad, pad], maxZoom: 5, animate: false });
+                return;
+            }
+
+            const token = ++flyToken;   // une nouvelle question annule l'animation en cours
+            const targetZoom = Math.min(5, map.getBoundsZoom(bounds, false, L.point(pad * 2, pad * 2)));
+            const center = bounds.getCenter();
+            const fly = () => {
+                if (token !== flyToken) return;
+                map.flyTo(center, targetZoom, { duration: 1.4, easeLinearity: 0.25 });
+            };
+
+            // 1) dézoom d'au moins 2 niveaux (si on est assez zoomé), 2) vol vers le pays, 3) rezoom
+            const midZoom = Math.max(map.getMinZoom(), Math.min(map.getZoom(), targetZoom) - 2);
+            if (map.getZoom() - midZoom >= 0.5) {
+                map.once("zoomend", fly);
+                map.setZoom(midZoom);
+            } else {
+                fly();
             }
         }
 
@@ -999,15 +1064,15 @@
             });
         }
 
-        // Mode contraste élevé : contours de tous les pays en blanc épais, par-dessus la carte
+        // Contraste élevé : contours de tous les pays en trait épais (blanc sur sombre, noir sur clair)
         function updateBorders() {
             if (!map) return;
             if (bordersLayer) { map.removeLayer(bordersLayer); bordersLayer = null; }
-            if (document.documentElement.dataset.theme !== "hc" || !worldGeoData) return;
+            if (!getAppearance().hc || !worldGeoData) return;
             bordersLayer = L.geoJSON(worldGeoData, {
                 pane: "borders",
                 interactive: false,
-                style: { fill: false, color: "#ffffff", weight: 1.6, opacity: 1 }
+                style: { fill: false, color: getAppearance().theme === "light" ? "#000000" : "#ffffff", weight: 1.6, opacity: 1 }
             }).addTo(map);
         }
 
