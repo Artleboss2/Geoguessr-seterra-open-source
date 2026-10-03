@@ -2,7 +2,11 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>GeoMaster - Challenges & Cartes Personnalisées</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -38,68 +42,129 @@
         @media (prefers-reduced-motion: reduce) {
             .highlighted-country { animation: none; }
         }
+
+        /* ======================= RESPONSIVE (téléphone / iPad) ======================= */
+        html, body { height: 100%; overscroll-behavior: none; }
+        body {
+            height: 100vh; height: 100dvh;               /* dvh : tient compte des barres du navigateur mobile */
+            -webkit-tap-highlight-color: transparent;
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        #app-header { padding-top: max(0.5rem, env(safe-area-inset-top)); }
+
+        /* iOS : sans ça, on ne peut pas écrire dans un champ à cause de select-none */
+        input, textarea { -webkit-user-select: text; user-select: text; }
+        button, select, label { touch-action: manipulation; }
+
+        .no-scrollbar { scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* Zone de jeu : carte au-dessus, panneau de réponse en dessous (téléphone, iPad vertical) */
+        #workspace { display: flex; flex-direction: column; }
+        #map-panel { position: relative; flex: 0 0 40%; min-height: 180px; border-bottom: 1px solid #1e293b; }
+        #side-panel { flex: 1 1 0; min-height: 0; }
+
+        /* iPad en mode portrait : carte plus grande */
+        @media (min-width: 768px) and (orientation: portrait) {
+            #map-panel { flex-basis: 48%; }
+        }
+        /* Ordinateur, iPad paysage, téléphone paysage : carte à gauche, panneau à droite */
+        @media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
+            #workspace { flex-direction: row; }
+            #map-panel { flex: 0 0 58%; min-height: 0; border-bottom: 0; border-right: 1px solid #1e293b; }
+        }
+        @media (min-width: 1280px) {
+            #map-panel { flex-basis: 66.6667%; }
+        }
+
+        /* Téléphone paysage : on gagne de la place */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .hide-on-short { display: none !important; }
+        }
+
+        /* Écrans tactiles : cibles plus grandes */
+        @media (pointer: coarse) {
+            button, select { min-height: 40px; }
+            .leaflet-touch .leaflet-bar a { width: 38px; height: 38px; line-height: 38px; }
+            #country-checklist label { font-size: 13px; padding: 6px 0; }
+            .chk-country { width: 20px; height: 20px; }
+        }
+
+        /* Évite le zoom automatique d'iOS quand on touche un champ de saisie */
+        @media (max-width: 1023px) {
+            input, select, textarea { font-size: 16px !important; }
+        }
+
+        /* Clavier virtuel ouvert : on libère de la place pour voir le champ de réponse */
+        body.kb-open #app-header,
+        body.kb-open #custom-challenge-banner { display: none !important; }
+        @media (orientation: portrait) {
+            body.kb-open #map-panel { flex-basis: 30%; min-height: 110px; }
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 h-screen flex flex-col font-sans overflow-hidden select-none">
+<body class="bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden select-none">
 
     <!-- Top Header Navigation -->
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 shrink-0 shadow-xl z-20">
-        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
+    <header id="app-header" class="bg-slate-900 border-b border-slate-800 px-3 sm:px-4 pb-2 shrink-0 shadow-xl z-20">
+        <div class="max-w-7xl mx-auto flex flex-wrap lg:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
 
-            <div class="flex items-center gap-3">
-                <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-2 rounded-xl text-slate-950 shadow-lg shadow-amber-500/20">
-                    <i data-lucide="map-pin" class="w-6 h-6"></i>
+            <div class="flex items-center gap-2.5 min-w-0 order-1">
+                <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-slate-950 shadow-lg shadow-amber-500/20 shrink-0">
+                    <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                 </div>
-                <div>
-                    <h1 class="font-black text-lg tracking-tight text-white flex items-center gap-2">
-                        GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30">Mode Pays</span>
+                <div class="min-w-0">
+                    <h1 class="font-black text-base sm:text-lg tracking-tight text-white flex items-center gap-2">
+                        GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30 whitespace-nowrap">Mode Pays</span>
                     </h1>
-                    <p id="mode-subtitle" class="text-xs text-slate-400">Trouve le pays ou la capitale du pays surligné</p>
+                    <p id="mode-subtitle" class="hidden sm:block hide-on-short text-xs text-slate-400 truncate">Trouve le pays ou la capitale du pays surligné</p>
                 </div>
-            </div>
-
-            <!-- Challenge selector & buttons -->
-            <div class="flex items-center flex-wrap gap-2">
-                <button onclick="openLibrary()" class="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95">
-                    <i data-lucide="search" class="w-4 h-4"></i> Rechercher un challenge
-                </button>
-
-                <select id="preset-select" onchange="onPresetChange()" class="bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[220px]">
-                    <!-- options générées par JS -->
-                </select>
-
-                <button onclick="openCustomChallengeModal()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer un challenge
-                </button>
-
-                <button onclick="openConfigModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration">
-                    <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> Config
-                </button>
             </div>
 
             <!-- Stats Bar -->
-            <div class="flex items-center gap-3 sm:gap-6 bg-slate-950/80 px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner">
+            <div class="order-2 lg:order-3 flex items-center gap-2.5 sm:gap-6 bg-slate-950/80 px-3 sm:px-4 py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
                 <div class="text-center">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trouvés</span>
-                    <span id="stat-score" class="font-extrabold text-base text-emerald-400">0</span>
+                    <span id="stat-score" class="font-extrabold text-sm sm:text-base text-emerald-400">0</span>
                 </div>
                 <div class="w-px h-5 bg-slate-800"></div>
                 <div class="text-center">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Série</span>
-                    <span id="stat-streak" class="font-extrabold text-base text-amber-400">0 🔥</span>
+                    <span id="stat-streak" class="font-extrabold text-sm sm:text-base text-amber-400">0 🔥</span>
                 </div>
                 <div class="w-px h-5 bg-slate-800"></div>
                 <div class="text-center">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progression</span>
-                    <span id="stat-progress" class="font-extrabold text-base text-indigo-400">0 / 0</span>
+                    <span id="stat-progress" class="font-extrabold text-sm sm:text-base text-indigo-400 whitespace-nowrap">0 / 0</span>
                 </div>
+            </div>
+
+            <!-- Challenge selector & buttons (défilement horizontal si l'écran est étroit) -->
+            <div id="header-actions" class="order-3 lg:order-2 w-full lg:w-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <button onclick="openLibrary()" class="shrink-0 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="search" class="w-4 h-4"></i> Rechercher<span class="hidden sm:inline">&nbsp;un challenge</span>
+                </button>
+
+                <select id="preset-select" onchange="onPresetChange()" class="shrink-0 bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[200px] sm:max-w-[220px]">
+                    <!-- options générées par JS -->
+                </select>
+
+                <button onclick="openCustomChallengeModal()" class="shrink-0 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer<span class="hidden sm:inline">&nbsp;un challenge</span>
+                </button>
+
+                <button onclick="openConfigModal()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration" aria-label="Configuration">
+                    <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> <span class="hidden sm:inline">Config</span>
+                </button>
             </div>
 
         </div>
     </header>
 
     <!-- Custom Challenge Active Banner -->
-    <div id="custom-challenge-banner" class="hidden bg-indigo-950/90 border-b border-indigo-500/40 px-4 py-2 text-xs flex items-center justify-between z-10">
+    <div id="custom-challenge-banner" class="hidden bg-indigo-950/90 border-b border-indigo-500/40 px-3 sm:px-4 py-1.5 sm:py-2 text-xs flex items-center justify-between gap-2 z-10 shrink-0">
         <div class="flex items-center gap-2 text-indigo-200 font-medium min-w-0">
             <i data-lucide="sparkles" class="w-4 h-4 text-amber-400 shrink-0"></i>
             <span class="truncate">Challenge : <strong id="custom-banner-title" class="text-white">--</strong></span>
@@ -107,7 +172,7 @@
         </div>
         <div class="flex items-center gap-2 shrink-0">
             <button onclick="copyCurrentChallengeShareLink()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition">
-                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Copier le lien
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Copier<span class="hidden sm:inline">&nbsp;le lien</span>
             </button>
             <button onclick="resetToDefaultChallenge()" class="text-indigo-300 hover:text-white text-xs underline">
                 Quitter
@@ -116,13 +181,13 @@
     </div>
 
     <!-- Main Workspace -->
-    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden relative">
+    <main id="workspace" class="flex-1 min-h-0 overflow-hidden relative">
 
         <!-- Map Panel -->
-        <div class="lg:col-span-7 xl:col-span-8 relative h-[45vh] lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800">
+        <div id="map-panel">
             <div id="map" class="w-full h-full"></div>
 
-            <div class="absolute top-4 left-4 z-[1000] bg-slate-900/90 border border-slate-700/80 backdrop-blur-md px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-300 flex items-center gap-2.5 shadow-xl">
+            <div class="absolute top-2.5 left-2.5 sm:top-4 sm:left-4 z-[1000] bg-slate-900/90 border border-slate-700/80 backdrop-blur-md px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-semibold text-amber-300 flex items-center gap-2 shadow-xl">
                 <span class="relative flex h-3 w-3">
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
@@ -130,20 +195,20 @@
                 <span id="target-map-label">Cible surlignée sur la carte</span>
             </div>
 
-            <div class="absolute bottom-4 left-4 z-[1000] flex flex-wrap gap-2">
-                <button onclick="resetMapView()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+            <div class="absolute bottom-6 left-2.5 sm:bottom-4 sm:left-4 z-[1000] flex flex-wrap gap-1.5 sm:gap-2">
+                <button onclick="resetMapView()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-[11px] sm:text-xs font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
                     <i data-lucide="globe" class="w-4 h-4 text-slate-400"></i> Vue globale
                 </button>
-                <button id="btn-auto-zoom" onclick="toggleAutoZoom()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+                <button id="btn-auto-zoom" onclick="toggleAutoZoom()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-[11px] sm:text-xs font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
                     <i data-lucide="zoom-in" class="w-4 h-4 text-amber-400"></i> <span id="zoom-toggle-text">Zoom auto : OUI</span>
                 </button>
             </div>
         </div>
 
         <!-- Sidebar Panel -->
-        <div class="lg:col-span-5 xl:col-span-4 bg-slate-900/95 flex flex-col h-[55vh] lg:h-full overflow-hidden">
+        <div id="side-panel" class="bg-slate-900/95 flex flex-col overflow-hidden">
 
-            <div class="p-4 border-b border-slate-800 space-y-3 shrink-0 bg-slate-900">
+            <div class="p-3 sm:p-4 border-b border-slate-800 space-y-2.5 sm:space-y-3 shrink-0 bg-slate-900">
                 <div class="flex items-center justify-between">
                     <span id="target-prompt" class="text-xs font-bold uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
                         <i data-lucide="help-circle" class="w-4 h-4"></i> Tape le nom du pays
@@ -151,7 +216,7 @@
                 </div>
 
                 <form onsubmit="handleTypeSubmit(event)" class="relative">
-                    <input type="text" id="type-input" placeholder="Tape ta réponse..." autocomplete="off"
+                    <input type="text" id="type-input" placeholder="Tape ta réponse..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"
                            class="w-full bg-slate-950 border-2 border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-3 pl-10 text-sm font-medium focus:border-amber-500 focus:outline-none transition shadow-inner">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
                     <button type="submit" class="absolute right-2 top-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-md transition active:scale-95">
@@ -170,7 +235,7 @@
             </div>
 
             <!-- Feedback Banner -->
-            <div id="feedback-banner" class="hidden shrink-0 mx-4 mt-3 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-lg transition-all">
+            <div id="feedback-banner" class="hidden shrink-0 mx-3 sm:mx-4 mt-3 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between gap-3 shadow-lg transition-all">
                 <span id="feedback-text" class="flex items-center gap-2"></span>
                 <button id="next-btn" class="hidden bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-xs transition">
                     Suivant
@@ -178,26 +243,26 @@
             </div>
 
             <!-- Scrollable List -->
-            <div class="flex-1 p-4 overflow-y-auto min-h-0">
+            <div class="flex-1 p-3 sm:p-4 overflow-y-auto min-h-0">
                 <div class="flex items-center justify-between mb-2.5">
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ou clique dans la liste :</span>
                     <span id="country-count" class="text-xs font-semibold text-slate-500 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">0 éléments</span>
                 </div>
 
-                <div id="country-list" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"></div>
+                <div id="country-list" class="grid grid-cols-2 gap-1.5"></div>
             </div>
         </div>
     </main>
 
     <!-- ======================= Library Modal (recherche) ======================= -->
     <div id="library-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
 
-            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
                 <div class="flex items-center gap-2 text-indigo-300 font-bold text-base">
                     <i data-lucide="library" class="w-5 h-5"></i> Bibliothèque de challenges
                 </div>
-                <button onclick="closeLibrary()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                <button onclick="closeLibrary()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -222,18 +287,18 @@
 
     <!-- ======================= Custom Challenge Modal ======================= -->
     <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
 
-            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                 <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
                     <i data-lucide="plus-circle" class="w-5 h-5"></i> Créer un challenge personnalisé
                 </div>
-                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
 
-            <div class="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -278,7 +343,7 @@
                 </div>
             </div>
 
-            <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3 shrink-0">
+            <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex flex-wrap justify-end gap-2 sm:gap-3 shrink-0">
                 <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
                     Annuler
                 </button>
@@ -293,16 +358,16 @@
     <div id="config-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
-            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                 <div class="flex items-center gap-2 text-emerald-400 font-bold text-base">
                     <i data-lucide="settings" class="w-5 h-5"></i> Configuration
                 </div>
-                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
 
-            <div class="p-6 space-y-4 text-xs">
+            <div class="p-4 sm:p-6 space-y-4 text-xs">
                 <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
                     <div class="flex items-center justify-between">
                         <span class="text-slate-300 font-semibold">Clé Carto (variable Vercel)</span>
@@ -325,7 +390,7 @@
                 </p>
             </div>
 
-            <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3 shrink-0">
+            <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex flex-wrap justify-end gap-2 sm:gap-3 shrink-0">
                 <button onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
                     Fermer
                 </button>
@@ -337,7 +402,7 @@
     </div>
 
     <!-- Toast -->
-    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[2000] max-w-[90vw] bg-slate-800 border border-slate-600 text-slate-100 text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl"></div>
+    <div id="toast" style="bottom: calc(1.25rem + env(safe-area-inset-bottom))" class="hidden fixed left-1/2 -translate-x-1/2 z-[2000] max-w-[90vw] bg-slate-800 border border-slate-600 text-slate-100 text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl"></div>
 
     <script>
         // ======================= DONNÉES =======================
@@ -573,6 +638,7 @@
 
             await fetchServerConfig();
             initMap();
+            setupResponsiveBehavior();
 
             const started = await checkUrlForSharedChallenge();
             if (!started) startChallenge(PRESETS[0]);
@@ -630,11 +696,11 @@
 
             if (serverCartoEnabled) {
                 // La clé reste sur le serveur : les tuiles passent par /api/tile
-                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}&v=4"; // v=4 : contourne les anciennes tuiles (avec noms ou filigrane) en cache
+                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}&v=5"; // v=5 : contourne les anciennes tuiles (avec noms ou filigrane) en cache
                 options = { attribution: "&copy; OpenStreetMap, CARTO", maxZoom: 19 };
             } else if (localKey) {
                 // CARTO exige désormais ?key= sur le chemin /rastertiles/
-                tileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(localKey)}`;
+                tileUrl = `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(localKey)}`;
                 options = { attribution: "&copy; OpenStreetMap, CARTO", subdomains: "abcd", maxZoom: 19 };
             } else {
                 // Sans clé, CARTO affiche un filigrane : fond sombre Esri, sans noms
@@ -789,7 +855,8 @@
             highlightedLayer = L.geoJSON(feature, { style: { className: "highlighted-country" } }).addTo(map);
 
             if (autoZoom) {
-                map.fitBounds(highlightedLayer.getBounds(), { padding: [50, 50], maxZoom: 5, animate: true, duration: 0.8 });
+                const pad = map.getSize().x < 500 ? 20 : 50;
+                map.fitBounds(highlightedLayer.getBounds(), { padding: [pad, pad], maxZoom: 5, animate: true, duration: 0.8 });
             }
         }
 
@@ -872,7 +939,7 @@
             const textEl = document.getElementById("feedback-text");
             const nextBtn = document.getElementById("next-btn");
 
-            banner.className = `shrink-0 mx-4 mt-3 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-lg ${bgClass}`;
+            banner.className = `shrink-0 mx-3 sm:mx-4 mt-3 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-3 shadow-lg ${bgClass}`;
             textEl.innerText = text;
 
             nextBtn.innerText = nextLabel;
@@ -1222,6 +1289,40 @@
             if (!currentChallenge || currentChallenge.source === "preset") return;
             const ok = await copyText(buildShareUrl(currentChallenge));
             showToast(ok ? "Lien du challenge copié !" : "Impossible de copier le lien.");
+        }
+
+
+        // ======================= TÉLÉPHONE / TABLETTE =======================
+        function setupResponsiveBehavior() {
+            const panel = document.getElementById("map-panel");
+            let resizeTimer = null;
+
+            // Recalcule la carte quand sa taille change (rotation, clavier, redimensionnement)
+            const refreshMap = () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    if (!map) return;
+                    map.invalidateSize();
+                    if (autoZoom && highlightedLayer) {
+                        const pad = map.getSize().x < 500 ? 20 : 50;
+                        map.fitBounds(highlightedLayer.getBounds(), { padding: [pad, pad], maxZoom: 5, animate: false });
+                    }
+                }, 150);
+            };
+
+            if ("ResizeObserver" in window) new ResizeObserver(refreshMap).observe(panel);
+            window.addEventListener("orientationchange", refreshMap);
+
+            // Clavier virtuel : on ajuste la hauteur de la page pour garder le champ de réponse visible
+            const vv = window.visualViewport;
+            if (vv) {
+                vv.addEventListener("resize", () => {
+                    const keyboardOpen = window.innerWidth < 1024 && vv.scale <= 1.01 && (window.innerHeight - vv.height) > 120;
+                    document.body.classList.toggle("kb-open", keyboardOpen);
+                    document.body.style.height = keyboardOpen ? `${vv.height}px` : "";
+                    if (keyboardOpen) window.scrollTo(0, 0);
+                });
+            }
         }
 
         // ======================= CONFIG =======================
