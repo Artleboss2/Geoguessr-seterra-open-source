@@ -13,7 +13,7 @@
         ::-webkit-scrollbar-track { background: #090d16; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #334155; }
-        
+
         #map { background-color: #0b0f19; z-index: 1; }
 
         .highlighted-country {
@@ -27,10 +27,14 @@
 
         @keyframes pulse-glow {
             from { fill-opacity: 0.55; stroke-width: 2px; filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6)); }
-            to { fill-opacity: 0.90; stroke-width: 3.5px; filter: shadow(0 0 14px rgba(245, 158, 11, 1)); }
+            to   { fill-opacity: 0.90; stroke-width: 3.5px; filter: drop-shadow(0 0 14px rgba(245, 158, 11, 1)); }
         }
 
         .leaflet-container { font-family: inherit; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .highlighted-country { animation: none; }
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 h-screen flex flex-col font-sans overflow-hidden select-none">
@@ -38,44 +42,35 @@
     <!-- Top Header Navigation -->
     <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 shrink-0 shadow-xl z-20">
         <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
-            
+
             <div class="flex items-center gap-3">
                 <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-2 rounded-xl text-slate-950 shadow-lg shadow-amber-500/20">
                     <i data-lucide="map-pin" class="w-6 h-6"></i>
                 </div>
                 <div>
                     <h1 class="font-black text-lg tracking-tight text-white flex items-center gap-2">
-                        GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30">Mode Type-In</span>
+                        GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30">Mode Pays</span>
                     </h1>
                     <p id="mode-subtitle" class="text-xs text-slate-400">Trouve le pays ou la capitale du pays surligné</p>
                 </div>
             </div>
 
-            <!-- Challenge Preset Selector & Custom Challenge Buttons -->
+            <!-- Challenge selector & buttons -->
             <div class="flex items-center flex-wrap gap-2">
-                <select id="preset-select" onchange="loadPresetChallenge()" class="bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition">
-                    <optgroup label="🌍 Challenges Généraux">
-                        <option value="ALL_COUNTRIES">Tous les pays du Monde (100)</option>
-                        <option value="ALL_CAPITALS">Capitales du Monde (100)</option>
-                    </optgroup>
-                    <optgroup label="🗺️ Cartes par Continent">
-                        <option value="AMERICAS_COUNTRIES">Amériques - Pays (24)</option>
-                        <option value="AMERICAS_CAPITALS">Amériques - Capitales (24)</option>
-                        <option value="EUROPE_COUNTRIES">Europe - Pays (30)</option>
-                        <option value="EUROPE_CAPITALS">Europe - Capitales (30)</option>
-                        <option value="ASIA_COUNTRIES">Asie & Moyen-Orient - Pays (26)</option>
-                        <option value="ASIA_CAPITALS">Asie & Moyen-Orient - Capitales (26)</option>
-                        <option value="AFRICA_COUNTRIES">Afrique - Pays (20)</option>
-                        <option value="AFRICA_CAPITALS">Afrique - Capitales (20)</option>
-                    </optgroup>
+                <button onclick="openLibrary()" class="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95">
+                    <i data-lucide="search" class="w-4 h-4"></i> Rechercher un challenge
+                </button>
+
+                <select id="preset-select" onchange="onPresetChange()" class="bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[220px]">
+                    <!-- options générées par JS -->
                 </select>
 
                 <button onclick="openCustomChallengeModal()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer Challenge
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer un challenge
                 </button>
 
-                <button onclick="openVercelConfigModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration Vercel DB / .env">
-                    <i data-lucide="database" class="w-4 h-4 text-emerald-400"></i> Config & Clés
+                <button onclick="openConfigModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration">
+                    <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> Config
                 </button>
             </div>
 
@@ -93,7 +88,7 @@
                 <div class="w-px h-5 bg-slate-800"></div>
                 <div class="text-center">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progression</span>
-                    <span id="stat-progress" class="font-extrabold text-base text-indigo-400">0 / 100</span>
+                    <span id="stat-progress" class="font-extrabold text-base text-indigo-400">0 / 0</span>
                 </div>
             </div>
 
@@ -102,14 +97,14 @@
 
     <!-- Custom Challenge Active Banner -->
     <div id="custom-challenge-banner" class="hidden bg-indigo-950/90 border-b border-indigo-500/40 px-4 py-2 text-xs flex items-center justify-between z-10">
-        <div class="flex items-center gap-2 text-indigo-200 font-medium">
-            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
-            <span>Challenge Personnalisé : <strong id="custom-banner-title" class="text-white">--</strong></span>
-            <span id="custom-banner-desc" class="text-indigo-300/80 text-[11px] hidden md:inline"></span>
+        <div class="flex items-center gap-2 text-indigo-200 font-medium min-w-0">
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400 shrink-0"></i>
+            <span class="truncate">Challenge : <strong id="custom-banner-title" class="text-white">--</strong></span>
+            <span id="custom-banner-desc" class="text-indigo-300/80 text-[11px] hidden md:inline truncate"></span>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 shrink-0">
             <button onclick="copyCurrentChallengeShareLink()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition">
-                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Copier Lien
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Copier le lien
             </button>
             <button onclick="resetToDefaultChallenge()" class="text-indigo-300 hover:text-white text-xs underline">
                 Quitter
@@ -117,10 +112,10 @@
         </div>
     </div>
 
-    <!-- Main Workspace (Map + Interactive Sidebar) -->
+    <!-- Main Workspace -->
     <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden relative">
 
-        <!-- Interactive Map Panel -->
+        <!-- Map Panel -->
         <div class="lg:col-span-7 xl:col-span-8 relative h-[45vh] lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800">
             <div id="map" class="w-full h-full"></div>
 
@@ -137,14 +132,14 @@
                     <i data-lucide="globe" class="w-4 h-4 text-slate-400"></i> Vue globale
                 </button>
                 <button id="btn-auto-zoom" onclick="toggleAutoZoom()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
-                    <i data-lucide="zoom-in" class="w-4 h-4 text-amber-400"></i> <span id="zoom-toggle-text">Zoom Auto : OUI</span>
+                    <i data-lucide="zoom-in" class="w-4 h-4 text-amber-400"></i> <span id="zoom-toggle-text">Zoom auto : OUI</span>
                 </button>
             </div>
         </div>
 
         <!-- Sidebar Panel -->
         <div class="lg:col-span-5 xl:col-span-4 bg-slate-900/95 flex flex-col h-[55vh] lg:h-full overflow-hidden">
-            
+
             <div class="p-4 border-b border-slate-800 space-y-3 shrink-0 bg-slate-900">
                 <div class="flex items-center justify-between">
                     <span id="target-prompt" class="text-xs font-bold uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
@@ -162,7 +157,7 @@
                 </form>
 
                 <div class="flex items-center gap-2 pt-1">
-                    <button onclick="revealAnswer()" class="flex-1 bg-slate-800 hover:bg-slate-750 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md">
+                    <button onclick="revealAnswer()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md">
                         <i data-lucide="eye" class="w-4 h-4"></i> Révéler la réponse
                     </button>
                     <button onclick="skipQuestion()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1 transition active:scale-95">
@@ -171,11 +166,11 @@
                 </div>
             </div>
 
-            <!-- Feedback Notification Banner -->
+            <!-- Feedback Banner -->
             <div id="feedback-banner" class="hidden shrink-0 mx-4 mt-3 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-lg transition-all">
                 <span id="feedback-text" class="flex items-center gap-2"></span>
-                <button id="next-btn" onclick="nextQuestion()" class="hidden bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-xs transition">
-                    Suivant <i data-lucide="arrow-right" class="w-3 h-3 inline"></i>
+                <button id="next-btn" class="hidden bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-xs transition">
+                    Suivant
                 </button>
             </div>
 
@@ -185,135 +180,164 @@
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ou clique dans la liste :</span>
                     <span id="country-count" class="text-xs font-semibold text-slate-500 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">0 éléments</span>
                 </div>
-                
-                <div id="country-list" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    <!-- List items rendered dynamically -->
-                </div>
+
+                <div id="country-list" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5"></div>
             </div>
-
         </div>
-
     </main>
 
-    <!-- Custom Challenge Creator Modal -->
+    <!-- ======================= Library Modal (recherche) ======================= -->
+    <div id="library-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+
+            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
+                <div class="flex items-center gap-2 text-indigo-300 font-bold text-base">
+                    <i data-lucide="library" class="w-5 h-5"></i> Bibliothèque de challenges
+                </div>
+                <button onclick="closeLibrary()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-4 border-b border-slate-800 space-y-3 shrink-0">
+                <div class="relative">
+                    <input type="text" id="lib-search" oninput="onLibrarySearchInput()" placeholder="Cherche par titre, description ou auteur..." autocomplete="off"
+                           class="w-full bg-slate-950 border-2 border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-2.5 pl-10 text-sm font-medium focus:border-indigo-500 focus:outline-none transition">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+                </div>
+                <div class="flex items-center gap-2 text-xs" id="lib-type-filters">
+                    <button data-type="ALL" onclick="setLibraryType('ALL')" class="lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition">Tous</button>
+                    <button data-type="COUNTRY" onclick="setLibraryType('COUNTRY')" class="lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition">Pays</button>
+                    <button data-type="CAPITAL" onclick="setLibraryType('CAPITAL')" class="lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition">Capitales</button>
+                </div>
+                <p id="lib-status" class="hidden text-[11px] rounded-lg px-3 py-2 border"></p>
+            </div>
+
+            <div id="lib-results" class="p-4 overflow-y-auto flex-1 space-y-4 min-h-0"></div>
+        </div>
+    </div>
+
+    <!-- ======================= Custom Challenge Modal ======================= -->
     <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-            
+
             <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                 <div class="flex items-center gap-2 text-amber-400 font-bold text-base">
-                    <i data-lucide="plus-circle" class="w-5 h-5"></i> Créer un Challenge Personnalisé
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i> Créer un challenge personnalisé
                 </div>
-                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
 
             <div class="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
-                
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-bold text-slate-300 mb-1">Titre du Challenge *</label>
-                        <input type="text" id="custom-title" placeholder="ex: Challenge des Capitales d'Europe" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                        <label class="block font-bold text-slate-300 mb-1">Titre du challenge *</label>
+                        <input type="text" id="custom-title" maxlength="80" placeholder="ex: Capitales d'Europe de l'Est" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
                     </div>
                     <div>
-                        <label class="block font-bold text-slate-300 mb-1">Type de Devinette *</label>
+                        <label class="block font-bold text-slate-300 mb-1">Type de devinette *</label>
                         <select id="custom-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
-                            <option value="COUNTRY">Deviner les Pays</option>
-                            <option value="CAPITAL">Deviner les Capitales</option>
+                            <option value="COUNTRY">Deviner les pays</option>
+                            <option value="CAPITAL">Deviner les capitales</option>
                         </select>
                     </div>
                 </div>
 
-                <div>
-                    <label class="block font-bold text-slate-300 mb-1">Description (Optionnel)</label>
-                    <input type="text" id="custom-desc" placeholder="ex: Teste tes connaissances avant l'examen de géo" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Description (optionnel)</label>
+                        <input type="text" id="custom-desc" maxlength="200" placeholder="ex: Révision avant l'examen de géo" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Ton nom (optionnel)</label>
+                        <input type="text" id="custom-author" maxlength="40" placeholder="ex: Alex" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none focus:border-amber-500">
+                    </div>
                 </div>
 
-                <!-- Country Selection Checklist -->
                 <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="font-bold text-slate-300">Sélectionne les pays inclus (<span id="selected-count">0</span>/100) :</label>
-                        <div class="flex gap-2">
-                            <button onclick="selectAllCountries(true)" class="text-amber-400 hover:underline text-[11px]">Tout cocher</button>
+                    <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                        <label class="font-bold text-slate-300">Pays inclus (<span id="selected-count">0</span>/<span id="total-count">100</span>) :</label>
+                        <div class="flex flex-wrap gap-2 items-center text-[11px]">
+                            <button onclick="selectRegion('Americas')" class="text-slate-300 hover:text-amber-400">+ Amériques</button>
+                            <button onclick="selectRegion('Europe')" class="text-slate-300 hover:text-amber-400">+ Europe</button>
+                            <button onclick="selectRegion('Asia')" class="text-slate-300 hover:text-amber-400">+ Asie</button>
+                            <button onclick="selectRegion('Africa')" class="text-slate-300 hover:text-amber-400">+ Afrique</button>
                             <span class="text-slate-600">|</span>
-                            <button onclick="selectAllCountries(false)" class="text-slate-400 hover:underline text-[11px]">Tout décocher</button>
+                            <button onclick="selectAllCountries(true)" class="text-amber-400 hover:underline">Tout cocher</button>
+                            <button onclick="selectAllCountries(false)" class="text-slate-400 hover:underline">Tout décocher</button>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3 max-h-56 overflow-y-auto" id="country-checklist">
-                        <!-- Checkboxes inserted dynamically -->
-                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3 max-h-56 overflow-y-auto" id="country-checklist"></div>
                 </div>
-
             </div>
 
             <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3 shrink-0">
                 <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
                     Annuler
                 </button>
-                <button onclick="saveAndGenerateChallenge()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-5 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
-                    <i data-lucide="share-2" class="w-4 h-4"></i> Sauvegarder & Obtenir le Lien
+                <button id="save-challenge-btn" onclick="saveAndGenerateChallenge()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-5 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                    <i data-lucide="share-2" class="w-4 h-4"></i> Sauvegarder et obtenir le lien
                 </button>
             </div>
-
         </div>
     </div>
 
-    <!-- Vercel Database API Keys / .env Config Modal -->
-    <div id="vercel-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <!-- ======================= Config Modal ======================= -->
+    <div id="config-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            
+
             <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                 <div class="flex items-center gap-2 text-emerald-400 font-bold text-base">
-                    <i data-lucide="database" class="w-5 h-5"></i> Configuration Clé API & Vercel
+                    <i data-lucide="settings" class="w-5 h-5"></i> Configuration
                 </div>
-                <button onclick="closeVercelConfigModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" aria-label="Fermer">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
 
             <div class="p-6 space-y-4 text-xs">
-                <p class="text-slate-300 leading-relaxed">
-                    Configure ta clé <strong>Carto.com</strong> et tes identifiants <strong>Vercel KV</strong> pour le chargement des cartes et la sauvegarde de tes défis.
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300 font-semibold">Clé Carto (variable Vercel)</span>
+                        <span id="status-carto" class="font-bold"></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300 font-semibold">Base de données des challenges</span>
+                        <span id="status-db" class="font-bold"></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-amber-400 mb-1">Clé API Carto (secours local, optionnel)</label>
+                    <input type="password" id="carto-key" placeholder="Utilisée seulement si Vercel n'en fournit pas" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-amber-500">
+                    <p class="text-[10px] text-slate-500 mt-1">La clé de Vercel (<code class="text-emerald-400">CARTO_API_KEY</code>) est prioritaire. Les fonds de carte CartoDB fonctionnent aussi sans clé.</p>
+                </div>
+
+                <p class="text-[11px] text-slate-400 leading-relaxed">
+                    Les identifiants de la base de données (<code class="text-emerald-400">KV_REST_API_URL</code> et <code class="text-emerald-400">KV_REST_API_TOKEN</code>) se configurent uniquement dans Vercel, jamais dans le navigateur.
                 </p>
-
-                <div>
-                    <label class="block font-bold text-amber-400 mb-1">Clé API Carto.com (CARTO_API_KEY)</label>
-                    <input type="password" id="carto-key" placeholder="Entre ta clé API Carto..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-amber-500">
-                    <p class="text-[10px] text-slate-500 mt-1">Sera ajoutée à l'URL des fonds de carte CartoDB.</p>
-                </div>
-
-                <hr class="border-slate-800">
-
-                <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
-                    <p>💡 <em>Note : Si tu déploies sur Vercel, ajoute <code class="text-emerald-400">CARTO_API_KEY</code> dans tes variables d'environnement <code class="text-emerald-400">.env</code>.</em></p>
-                </div>
-
-                <div>
-                    <label class="block font-bold text-slate-300 mb-1">VERCEL_KV_REST_API_URL</label>
-                    <input type="text" id="kv-url" placeholder="https://...kv.vercel-storage.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-emerald-500">
-                </div>
-
-                <div>
-                    <label class="block font-bold text-slate-300 mb-1">VERCEL_KV_REST_API_TOKEN</label>
-                    <input type="password" id="kv-token" placeholder="AXXXXXXXXX..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-emerald-500">
-                </div>
             </div>
 
             <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3 shrink-0">
-                <button onclick="closeVercelConfigModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
+                <button onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition">
                     Fermer
                 </button>
-                <button onclick="saveVercelKeys()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
-                    <i data-lucide="save" class="w-4 h-4"></i> Enregistrer Clés
+                <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                    <i data-lucide="save" class="w-4 h-4"></i> Enregistrer
                 </button>
             </div>
-
         </div>
     </div>
 
+    <!-- Toast -->
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[2000] max-w-[90vw] bg-slate-800 border border-slate-600 text-slate-100 text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl"></div>
+
     <script>
-        // Comprehensive Database of 100 Countries with Capitals and Aliases
+        // ======================= DONNÉES =======================
         const countriesList = [
             // AMÉRIQUES (24)
             { id: "CAN", name: "Canada", capital: "Ottawa", region: "Americas", aliases: ["canada", "can"], capitalAliases: ["ottawa"] },
@@ -366,7 +390,7 @@
             { id: "DNK", name: "Danemark", capital: "Copenhague", region: "Europe", aliases: ["danemark"], capitalAliases: ["copenhague", "copenhagen"] },
             { id: "SVN", name: "Slovénie", capital: "Ljubljana", region: "Europe", aliases: ["slovenie"], capitalAliases: ["ljubljana"] },
             { id: "HRV", name: "Croatie", capital: "Zagreb", region: "Europe", aliases: ["croatie"], capitalAliases: ["zagreb"] },
-            { id: "BIH", name: "Bosnie-Herzégovine", capital: "Sarajevo", region: "Europe", aliases: ["bosnie"], capitalAliases: ["sarajevo"] },
+            { id: "BIH", name: "Bosnie-Herzégovine", capital: "Sarajevo", region: "Europe", aliases: ["bosnie", "bosnie herzegovine"], capitalAliases: ["sarajevo"] },
             { id: "SRB", name: "Serbie", capital: "Belgrade", region: "Europe", aliases: ["serbie"], capitalAliases: ["belgrade"] },
             { id: "MNE", name: "Monténégro", capital: "Podgorica", region: "Europe", aliases: ["montenegro"], capitalAliases: ["podgorica"] },
             { id: "ALB", name: "Albanie", capital: "Tirana", region: "Europe", aliases: ["albanie"], capitalAliases: ["tirana"] },
@@ -389,7 +413,7 @@
             { id: "VNM", name: "Vietnam", capital: "Hanoï", region: "Asia", aliases: ["vietnam"], capitalAliases: ["hanoi", "hanoï"] },
             { id: "IDN", name: "Indonésie", capital: "Jakarta", region: "Asia", aliases: ["indonesie"], capitalAliases: ["jakarta"] },
             { id: "PHL", name: "Philippines", capital: "Manille", region: "Asia", aliases: ["philippines"], capitalAliases: ["manille", "manila"] },
-            { id: "TLS", name: "Timor-Leste", capital: "Dili", region: "Asia", aliases: ["timor leste"], capitalAliases: ["dili"] },
+            { id: "TLS", name: "Timor-Leste", capital: "Dili", region: "Asia", aliases: ["timor leste", "timor oriental"], capitalAliases: ["dili"] },
             { id: "IRN", name: "Iran", capital: "Téhéran", region: "Asia", aliases: ["iran"], capitalAliases: ["teheran", "téhéran"] },
             { id: "IRQ", name: "Irak", capital: "Bagdad", region: "Asia", aliases: ["irak", "iraq"], capitalAliases: ["bagdad", "baghdad"] },
             { id: "SYR", name: "Syrie", capital: "Damas", region: "Asia", aliases: ["syrie"], capitalAliases: ["damas", "damascus"] },
@@ -398,7 +422,8 @@
             { id: "SAU", name: "Arabie Saoudite", capital: "Riyad", region: "Asia", aliases: ["arabie saoudite"], capitalAliases: ["riyad", "riyadh"] },
             { id: "YEM", name: "Yémen", capital: "Sanaa", region: "Asia", aliases: ["yemen"], capitalAliases: ["sanaa", "sana'a"] },
             { id: "ARM", name: "Arménie", capital: "Erevan", region: "Asia", aliases: ["armenie"], capitalAliases: ["erevan", "yerevan"] },
-            { id: "AZE", name: "Azerbaïdjan", capital: "Brakou", region: "Asia", aliases: ["azerbaidjan"], capitalAliases: ["bakou", "baku"] },
+            { id: "AZE", name: "Azerbaïdjan", capital: "Bakou", region: "Asia", aliases: ["azerbaidjan"], capitalAliases: ["bakou", "baku"] },
+            { id: "GEO", name: "Géorgie", capital: "Tbilissi", region: "Asia", aliases: ["georgie"], capitalAliases: ["tbilissi", "tbilisi"] },
 
             // AFRIQUE (20)
             { id: "MAR", name: "Maroc", capital: "Rabat", region: "Africa", aliases: ["maroc"], capitalAliases: ["rabat"] },
@@ -407,14 +432,14 @@
             { id: "LBY", name: "Libye", capital: "Tripoli", region: "Africa", aliases: ["libye"], capitalAliases: ["tripoli"] },
             { id: "EGY", name: "Égypte", capital: "Le Caire", region: "Africa", aliases: ["egypte"], capitalAliases: ["le caire", "caire", "cairo"] },
             { id: "SDN", name: "Soudan", capital: "Khartoum", region: "Africa", aliases: ["soudan"], capitalAliases: ["khartoum"] },
-            { id: "SSD", name: "Sud Soudan", capital: "Juba", region: "Africa", aliases: ["sud soudan"], capitalAliases: ["juba"] },
+            { id: "SSD", name: "Soudan du Sud", capital: "Juba", region: "Africa", aliases: ["soudan du sud", "sud soudan"], capitalAliases: ["juba"] },
             { id: "ETH", name: "Éthiopie", capital: "Addis-Abeba", region: "Africa", aliases: ["ethiopie"], capitalAliases: ["addis abeba", "addis-abeba"] },
             { id: "SOM", name: "Somalie", capital: "Mogadiscio", region: "Africa", aliases: ["somalie"], capitalAliases: ["mogadiscio", "mogadishu"] },
             { id: "UGA", name: "Ouganda", capital: "Kampala", region: "Africa", aliases: ["ouganda"], capitalAliases: ["kampala"] },
             { id: "RWA", name: "Rwanda", capital: "Kigali", region: "Africa", aliases: ["rwanda"], capitalAliases: ["kigali"] },
-            { id: "COD", name: "République démocratique du Congo", capital: "Kinshasa", region: "Africa", aliases: ["congo", "rdc"], capitalAliases: ["kinshasa"] },
-            { id: "CAF", name: "République centrafricaine", capital: "Bangui", region: "Africa", aliases: ["centrafrique"], capitalAliases: ["bangui"] },
-            { id: "TCD", name: "Tchad", capital: "N'Djaména", region: "Africa", aliases: ["tchad"], capitalAliases: ["ndjamena", "n'djamena"] },
+            { id: "COD", name: "République démocratique du Congo", capital: "Kinshasa", region: "Africa", aliases: ["congo", "rdc", "republique democratique du congo"], capitalAliases: ["kinshasa"] },
+            { id: "CAF", name: "République centrafricaine", capital: "Bangui", region: "Africa", aliases: ["centrafrique", "republique centrafricaine"], capitalAliases: ["bangui"] },
+            { id: "TCD", name: "Tchad", capital: "N'Djaména", region: "Africa", aliases: ["tchad"], capitalAliases: ["ndjamena", "n'djamena", "n djamena"] },
             { id: "MLI", name: "Mali", capital: "Bamako", region: "Africa", aliases: ["mali"], capitalAliases: ["bamako"] },
             { id: "SEN", name: "Sénégal", capital: "Dakar", region: "Africa", aliases: ["senegal"], capitalAliases: ["dakar"] },
             { id: "NGA", name: "Nigéria", capital: "Abuja", region: "Africa", aliases: ["nigeria"], capitalAliases: ["abuja"] },
@@ -423,108 +448,259 @@
             { id: "MDG", name: "Madagascar", capital: "Antananarivo", region: "Africa", aliases: ["madagascar"], capitalAliases: ["antananarivo", "tana"] }
         ];
 
+        const countryById = Object.fromEntries(countriesList.map(c => [c.id, c]));
+
+        // Identifiants alternatifs dans le fichier GeoJSON Natural Earth
+        const GEO_ALT_IDS = { XKX: ["KOS"], SSD: ["SDS"] };
+
+        // Challenges officiels (générés à partir de la liste des pays)
+        const PRESET_GROUPS = [
+            { key: "WORLD",    label: "Monde",                filter: () => true },
+            { key: "Americas", label: "Amériques",            filter: c => c.region === "Americas" },
+            { key: "Europe",   label: "Europe",               filter: c => c.region === "Europe" },
+            { key: "Asia",     label: "Asie & Moyen-Orient",  filter: c => c.region === "Asia" },
+            { key: "Africa",   label: "Afrique",              filter: c => c.region === "Africa" }
+        ];
+
+        const PRESETS = [];
+        PRESET_GROUPS.forEach(group => {
+            ["COUNTRY", "CAPITAL"].forEach(type => {
+                const ids = countriesList.filter(group.filter).map(c => c.id);
+                PRESETS.push({
+                    id: `${group.key}_${type}`,
+                    title: `${group.label} – ${type === "COUNTRY" ? "Pays" : "Capitales"}`,
+                    type,
+                    desc: group.key === "WORLD"
+                        ? `Tous les ${type === "COUNTRY" ? "pays" : "pays (devine la capitale)"} de la carte`
+                        : `${type === "COUNTRY" ? "Les pays" : "Les capitales"} de la zone ${group.label}`,
+                    author: "GeoMaster",
+                    countryIds: ids,
+                    source: "preset"
+                });
+            });
+        });
+
+        // ======================= ÉTAT =======================
         let map;
         let tileLayerInstance = null;
         let highlightedLayer = null;
         let worldGeoData = null;
-        
-        let currentChallengeType = "COUNTRY"; // "COUNTRY" or "CAPITAL"
+
+        let currentChallenge = null;
+        let fullPool = [];
         let activePool = [];
         let currentTarget = null;
-        let activeCustomChallengeData = null;
-        
+        let answered = false;
+
         let score = 0;
         let streak = 0;
         let totalAnswered = 0;
         let autoZoom = true;
 
-        document.addEventListener("DOMContentLoaded", () => {
+        let serverCartoKey = "";
+        let dbConfigured = null; // null = inconnu, true/false après /api/config
+
+        const challengeType = () => (currentChallenge && currentChallenge.type) || "COUNTRY";
+
+        // ======================= UTILITAIRES =======================
+        function normalizeString(str) {
+            return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function el(tag, className, text) {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text !== undefined) node.textContent = text;
+            return node;
+        }
+
+        let toastTimer = null;
+        function showToast(message, duration = 3500) {
+            const t = document.getElementById("toast");
+            t.textContent = message;
+            t.classList.remove("hidden");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => t.classList.add("hidden"), duration);
+        }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (e) {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                let ok = false;
+                try { ok = document.execCommand("copy"); } catch (err) {}
+                document.body.removeChild(ta);
+                return ok;
+            }
+        }
+
+        // Valide et nettoie un challenge venant d'un lien ou de la base
+        function sanitizeChallenge(obj) {
+            if (!obj || typeof obj !== "object") return null;
+            const ids = Array.isArray(obj.countryIds) ? obj.countryIds.filter(id => countryById[id]) : [];
+            if (ids.length < 1 || typeof obj.title !== "string" || !obj.title.trim()) return null;
+            return {
+                id: typeof obj.id === "string" ? obj.id : null,
+                title: obj.title.trim().slice(0, 80),
+                type: obj.type === "CAPITAL" ? "CAPITAL" : "COUNTRY",
+                desc: typeof obj.desc === "string" ? obj.desc.slice(0, 200) : "",
+                author: typeof obj.author === "string" ? obj.author.slice(0, 40) : "",
+                countryIds: [...new Set(ids)],
+                createdAt: obj.createdAt || Date.now()
+            };
+        }
+
+        // ======================= INITIALISATION =======================
+        document.addEventListener("DOMContentLoaded", async () => {
+            buildPresetSelect();
+            populateChecklist();
             lucide.createIcons();
-            fetchServerConfig().then(() => {
-                initMap();
-                populateChecklist();
-                checkUrlForSharedChallenge();
-            });
+
+            await fetchServerConfig();
+            initMap();
+
+            const started = await checkUrlForSharedChallenge();
+            if (!started) startChallenge(PRESETS[0]);
         });
 
-        // Essaye de récupérer dynamiquement la clé .env depuis une API Vercel si elle existe
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                closeLibrary();
+                closeCustomChallengeModal();
+                closeConfigModal();
+            }
+        });
+
+        // Récupère la clé Carto depuis la route Vercel /api/config
         async function fetchServerConfig() {
             try {
-                const res = await fetch('/api/config');
+                const res = await fetch("/api/config", { cache: "no-store" });
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.CARTO_API_KEY) {
-                        localStorage.setItem('CARTO_API_KEY', data.CARTO_API_KEY);
-                    }
+                    serverCartoKey = data.CARTO_API_KEY || "";
+                    dbConfigured = Boolean(data.DB_CONFIGURED);
                 }
             } catch (e) {
-                // Pas d'endpoint Vercel API trouvé, continue avec localStorage
+                console.warn("Pas d'endpoint /api/config (mode local ?), utilisation du localStorage.");
             }
+        }
+
+        function getCartoKey() {
+            return serverCartoKey || localStorage.getItem("CARTO_API_KEY") || "";
         }
 
         function initMap() {
-            map = L.map('map', { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 7, zoomControl: false });
-            L.control.zoom({ position: 'topright' }).addTo(map);
+            map = L.map("map", { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 7, zoomControl: false });
+            L.control.zoom({ position: "topright" }).addTo(map);
 
             updateMapTileLayer();
 
-            fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson')
+            fetch("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
                 .then(res => res.json())
                 .then(data => {
                     worldGeoData = data;
-                    if (!activeCustomChallengeData) {
-                        loadPresetChallenge();
-                    }
+                    if (currentTarget) highlightTargetOnMap(currentTarget);
                 })
-                .catch(err => console.error("Erreur GeoJSON", err));
+                .catch(err => {
+                    console.error("Erreur GeoJSON", err);
+                    showToast("Impossible de charger les frontières des pays.");
+                });
         }
 
         function updateMapTileLayer() {
-            if (tileLayerInstance) {
-                map.removeLayer(tileLayerInstance);
-            }
+            if (tileLayerInstance) map.removeLayer(tileLayerInstance);
 
-            const cartoApiKey = localStorage.getItem('CARTO_API_KEY') || '';
-            const tileUrl = cartoApiKey 
-                ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${cartoApiKey}`
-                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            const key = getCartoKey();
+            const tileUrl = key
+                ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(key)}`
+                : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
             tileLayerInstance = L.tileLayer(tileUrl, {
-                attribution: '&copy; OpenStreetMap, CartoDB',
-                subdomains: 'abcd',
+                attribution: "&copy; OpenStreetMap, CartoDB",
+                subdomains: "abcd",
                 maxZoom: 19
             }).addTo(map);
         }
 
-        function loadPresetChallenge() {
-            const val = document.getElementById('preset-select').value;
-            activeCustomChallengeData = null;
-            document.getElementById('custom-challenge-banner').classList.add('hidden');
+        // ======================= CHALLENGES =======================
+        function buildPresetSelect() {
+            const select = document.getElementById("preset-select");
+            select.innerHTML = "";
 
-            let pool = [];
-            if (val === 'ALL_COUNTRIES') {
-                currentChallengeType = 'COUNTRY';
-                pool = [...countriesList];
-            } else if (val === 'ALL_CAPITALS') {
-                currentChallengeType = 'CAPITAL';
-                pool = [...countriesList];
+            const hidden = document.createElement("option");
+            hidden.value = "";
+            hidden.id = "preset-custom-option";
+            hidden.textContent = "Challenge de la bibliothèque";
+            hidden.hidden = true;
+            select.appendChild(hidden);
+
+            const groupWorld = document.createElement("optgroup");
+            groupWorld.label = "🌍 Challenges généraux";
+            const groupRegions = document.createElement("optgroup");
+            groupRegions.label = "🗺️ Cartes par continent";
+
+            PRESETS.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = `${p.title} (${p.countryIds.length})`;
+                (p.id.startsWith("WORLD") ? groupWorld : groupRegions).appendChild(opt);
+            });
+
+            select.appendChild(groupWorld);
+            select.appendChild(groupRegions);
+        }
+
+        function onPresetChange() {
+            const id = document.getElementById("preset-select").value;
+            const preset = PRESETS.find(p => p.id === id);
+            if (!preset) return;
+            window.history.replaceState({}, document.title, window.location.pathname);
+            startChallenge(preset);
+        }
+
+        function startChallenge(data) {
+            currentChallenge = data;
+            const isPreset = data.source === "preset";
+
+            const select = document.getElementById("preset-select");
+            select.value = isPreset ? data.id : "";
+
+            const banner = document.getElementById("custom-challenge-banner");
+            if (isPreset) {
+                banner.classList.add("hidden");
             } else {
-                const [region, type] = val.split('_');
-                currentChallengeType = type === 'CAPITALS' ? 'CAPITAL' : 'COUNTRY';
-                const regMap = { 'AMERICAS': 'Americas', 'EUROPE': 'Europe', 'ASIA': 'Asia', 'AFRICA': 'Africa' };
-                pool = countriesList.filter(c => c.region === regMap[region]);
+                document.getElementById("custom-banner-title").innerText = data.title;
+                document.getElementById("custom-banner-desc").innerText = data.desc ? `— ${data.desc}` : "";
+                banner.classList.remove("hidden");
             }
 
             updateUIForMode();
-            startNewSession(pool);
+            startNewSession(countriesList.filter(c => data.countryIds.includes(c.id)));
+        }
+
+        function resetToDefaultChallenge() {
+            window.history.replaceState({}, document.title, window.location.pathname);
+            startChallenge(PRESETS[0]);
         }
 
         function updateUIForMode() {
-            const badge = document.getElementById('mode-badge');
-            const prompt = document.getElementById('target-prompt');
-            const input = document.getElementById('type-input');
+            const badge = document.getElementById("mode-badge");
+            const prompt = document.getElementById("target-prompt");
+            const input = document.getElementById("type-input");
 
-            if (currentChallengeType === 'CAPITAL') {
+            if (challengeType() === "CAPITAL") {
                 badge.innerText = "Mode Capitales";
                 prompt.innerHTML = `<i data-lucide="building-2" class="w-4 h-4 text-amber-400"></i> Tape la capitale du pays surligné`;
                 input.placeholder = "Tape le nom de la capitale...";
@@ -540,6 +716,7 @@
             score = 0;
             streak = 0;
             totalAnswered = 0;
+            fullPool = [...pool];
             activePool = [...pool];
             shuffleArray(activePool);
             updateDashboard();
@@ -548,135 +725,175 @@
         }
 
         function nextQuestion() {
-            document.getElementById('feedback-banner').classList.add('hidden');
-            const inputField = document.getElementById('type-input');
-            inputField.value = '';
+            document.getElementById("feedback-banner").classList.add("hidden");
+            answered = false;
+
+            const inputField = document.getElementById("type-input");
+            inputField.value = "";
             inputField.focus();
 
             if (activePool.length === 0) {
-                showFeedback("🎉 Session terminée ! Bravo.", "bg-indigo-600 text-white", false);
+                currentTarget = null;
+                if (highlightedLayer) { map.removeLayer(highlightedLayer); highlightedLayer = null; }
+                document.getElementById("target-map-label").innerText = "Session terminée";
+                showFeedback(
+                    `🎉 Session terminée ! Score : ${score} / ${fullPool.length}`,
+                    "bg-indigo-600 text-white",
+                    true, "Rejouer", restartSession
+                );
                 return;
             }
 
             currentTarget = activePool.pop();
+            document.getElementById("target-map-label").innerText =
+                `Cible ${Math.min(totalAnswered + 1, fullPool.length)} / ${fullPool.length}`;
             highlightTargetOnMap(currentTarget);
         }
 
-        function highlightTargetOnMap(country) {
-            if (!worldGeoData) return;
-            if (highlightedLayer) map.removeLayer(highlightedLayer);
+        function restartSession() {
+            startNewSession(countriesList.filter(c => currentChallenge.countryIds.includes(c.id)));
+        }
 
-            const feature = worldGeoData.features.find(f => {
-                const iso3 = f.properties.ADM0_A3 || f.properties.ISO_A3;
-                return iso3 === country.id || f.properties.NAME_FR?.toLowerCase() === country.name.toLowerCase();
+        // ======================= CARTE =======================
+        function findFeature(country) {
+            const ids = [country.id, ...(GEO_ALT_IDS[country.id] || [])];
+            const wantedName = normalizeString(country.name);
+            return worldGeoData.features.find(f => {
+                const p = f.properties || {};
+                if ([p.ADM0_A3, p.ISO_A3, p.ISO_A3_EH].some(v => v && ids.includes(v))) return true;
+                return normalizeString(p.NAME_FR) === wantedName;
             });
+        }
 
-            if (feature) {
-                highlightedLayer = L.geoJSON(feature, { style: { className: 'highlighted-country' } }).addTo(map);
+        function highlightTargetOnMap(country) {
+            if (!worldGeoData || !map) return;
+            if (highlightedLayer) { map.removeLayer(highlightedLayer); highlightedLayer = null; }
 
-                if (autoZoom) {
-                    map.fitBounds(highlightedLayer.getBounds(), { padding: [50, 50], maxZoom: 5, animate: true, duration: 0.8 });
-                }
+            const feature = findFeature(country);
+            if (!feature) {
+                showToast(`Le pays « ${country.name} » est introuvable sur la carte.`);
+                return;
+            }
+
+            highlightedLayer = L.geoJSON(feature, { style: { className: "highlighted-country" } }).addTo(map);
+
+            if (autoZoom) {
+                map.fitBounds(highlightedLayer.getBounds(), { padding: [50, 50], maxZoom: 5, animate: true, duration: 0.8 });
             }
         }
 
         function toggleAutoZoom() {
             autoZoom = !autoZoom;
-            document.getElementById('zoom-toggle-text').innerText = `Zoom Auto : ${autoZoom ? 'OUI' : 'NON'}`;
+            document.getElementById("zoom-toggle-text").innerText = `Zoom auto : ${autoZoom ? "OUI" : "NON"}`;
             if (autoZoom && currentTarget) highlightTargetOnMap(currentTarget);
         }
 
         function resetMapView() { map.setView([20, 0], 2); }
 
-        function normalizeString(str) {
-            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        }
-
+        // ======================= JEU =======================
         function handleTypeSubmit(e) {
             e.preventDefault();
-            const inputVal = normalizeString(document.getElementById('type-input').value);
+            if (answered) { nextQuestion(); return; }
+
+            const inputVal = normalizeString(document.getElementById("type-input").value);
             if (!inputVal || !currentTarget) return;
 
-            let isCorrect = false;
-            if (currentChallengeType === 'CAPITAL') {
-                isCorrect = currentTarget.capitalAliases.some(a => normalizeString(a) === inputVal) || normalizeString(currentTarget.capital) === inputVal;
+            let isCorrect;
+            if (challengeType() === "CAPITAL") {
+                isCorrect = currentTarget.capitalAliases.some(a => normalizeString(a) === inputVal) ||
+                            normalizeString(currentTarget.capital) === inputVal;
             } else {
-                isCorrect = currentTarget.aliases.some(a => normalizeString(a) === inputVal) || normalizeString(currentTarget.name) === inputVal;
+                isCorrect = currentTarget.aliases.some(a => normalizeString(a) === inputVal) ||
+                            normalizeString(currentTarget.name) === inputVal;
             }
 
             if (isCorrect) handleSuccess();
-            else handleFailure("Mauvaise réponse, réessaye !");
+            else handleFailure("Mauvaise réponse, réessaie !");
         }
 
         function selectCountryFromList(countryId) {
-            if (!currentTarget) return;
+            if (!currentTarget || answered) return;
             if (countryId === currentTarget.id) handleSuccess();
-            else handleFailure("Ce n'est pas ce pays !");
+            else handleFailure(challengeType() === "CAPITAL" ? "Ce n'est pas la bonne capitale !" : "Ce n'est pas ce pays !");
         }
 
         function handleSuccess() {
+            answered = true;
             score++; streak++; totalAnswered++;
             updateDashboard();
-            markListButton(currentTarget.id, 'correct');
-            const targetText = currentChallengeType === 'CAPITAL' ? `${currentTarget.capital} (${currentTarget.name})` : currentTarget.name;
-            showFeedback(` Bravo ! C'est bien ${targetText}`, "bg-emerald-950/90 text-emerald-200 border border-emerald-500/50", true);
+            markListButton(currentTarget.id, "correct");
+            const text = challengeType() === "CAPITAL"
+                ? `${currentTarget.capital} (${currentTarget.name})`
+                : currentTarget.name;
+            showFeedback(`Bravo ! C'est bien ${text}`, "bg-emerald-950/90 text-emerald-200 border border-emerald-500/50", true);
         }
 
         function handleFailure(msg) {
             streak = 0;
             updateDashboard();
-            showFeedback(` ${msg}`, "bg-amber-950/90 text-amber-200 border border-amber-500/50", false);
+            showFeedback(msg, "bg-amber-950/90 text-amber-200 border border-amber-500/50", false);
         }
 
         function revealAnswer() {
-            if (!currentTarget) return;
+            if (!currentTarget || answered) return;
+            answered = true;
             streak = 0; totalAnswered++;
             updateDashboard();
-            const ansText = currentChallengeType === 'CAPITAL' ? `${currentTarget.capital} (Pays: ${currentTarget.name})` : currentTarget.name;
-            showFeedback(` C'était : ${ansText}`, "bg-rose-950/90 text-rose-200 border border-rose-500/50", true);
-            markListButton(currentTarget.id, 'revealed');
+            const text = challengeType() === "CAPITAL"
+                ? `${currentTarget.capital} (pays : ${currentTarget.name})`
+                : currentTarget.name;
+            showFeedback(`C'était : ${text}`, "bg-rose-950/90 text-rose-200 border border-rose-500/50", true);
+            markListButton(currentTarget.id, "revealed");
         }
 
-        function skipQuestion() { nextQuestion(); }
+        function skipQuestion() {
+            if (!currentTarget) return;
+            // Une question passée sans réponse revient plus tard dans la session
+            if (!answered) {
+                if (activePool.length === 0) { showToast("C'est la dernière question."); return; }
+                activePool.unshift(currentTarget);
+            }
+            nextQuestion();
+        }
 
-        function showFeedback(text, bgClass, showNext) {
-            const banner = document.getElementById('feedback-banner');
-            const textEl = document.getElementById('feedback-text');
-            const nextBtn = document.getElementById('next-btn');
+        function showFeedback(text, bgClass, showNext, nextLabel = "Suivant", nextAction = nextQuestion) {
+            const banner = document.getElementById("feedback-banner");
+            const textEl = document.getElementById("feedback-text");
+            const nextBtn = document.getElementById("next-btn");
 
             banner.className = `shrink-0 mx-4 mt-3 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-lg ${bgClass}`;
             textEl.innerText = text;
-            banner.classList.remove('hidden');
 
-            if (showNext) nextBtn.classList.remove('hidden');
-            else nextBtn.classList.add('hidden');
+            nextBtn.innerText = nextLabel;
+            nextBtn.onclick = nextAction;
+            nextBtn.classList.toggle("hidden", !showNext);
         }
 
         function updateDashboard() {
-            document.getElementById('stat-score').innerText = score;
-            document.getElementById('stat-streak').innerText = `${streak} 🔥`;
-            const total = activeCustomChallengeData ? activeCustomChallengeData.countryIds.length : activePool.length + totalAnswered;
-            document.getElementById('stat-progress').innerText = `${totalAnswered} / ${total || 100}`;
+            document.getElementById("stat-score").innerText = score;
+            document.getElementById("stat-streak").innerText = `${streak} 🔥`;
+            document.getElementById("stat-progress").innerText = `${totalAnswered} / ${fullPool.length}`;
         }
 
         function renderCountryList() {
-            const listEl = document.getElementById('country-list');
-            const source = activeCustomChallengeData ? 
-                countriesList.filter(c => activeCustomChallengeData.countryIds.includes(c.id)) : 
-                activePool;
+            const listEl = document.getElementById("country-list");
+            const sorted = [...fullPool].sort((a, b) => {
+                const A = challengeType() === "CAPITAL" ? a.capital : a.name;
+                const B = challengeType() === "CAPITAL" ? b.capital : b.name;
+                return A.localeCompare(B, "fr");
+            });
+            document.getElementById("country-count").innerText = `${sorted.length} éléments`;
 
-            const sorted = [...source].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-            document.getElementById('country-count').innerText = `${sorted.length} éléments`;
-
-            listEl.innerHTML = '';
+            listEl.innerHTML = "";
             sorted.forEach(c => {
-                const btn = document.createElement('button');
+                const btn = document.createElement("button");
                 btn.id = `btn-country-${c.id}`;
                 btn.className = "w-full text-left bg-slate-950 hover:bg-slate-800 text-slate-300 font-medium px-3 py-2 rounded-xl border border-slate-800 hover:border-slate-700 text-xs transition flex items-center justify-between group active:scale-98";
                 btn.onclick = () => selectCountryFromList(c.id);
 
-                const label = currentChallengeType === 'CAPITAL' ? `${c.capital} <span class="text-slate-500 text-[10px]">(${c.name})</span>` : c.name;
-                btn.innerHTML = `<span class="truncate">${label}</span><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-amber-400 transition"></i>`;
+                const label = el("span", "truncate", challengeType() === "CAPITAL" ? c.capital : c.name);
+                btn.appendChild(label);
+                btn.insertAdjacentHTML("beforeend", `<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-amber-400 transition"></i>`);
                 listEl.appendChild(btn);
             });
             lucide.createIcons();
@@ -685,211 +902,355 @@
         function markListButton(id, state) {
             const btn = document.getElementById(`btn-country-${id}`);
             if (!btn) return;
-            if (state === 'correct') btn.className = "w-full text-left bg-emerald-950 text-emerald-200 font-bold px-3 py-2 rounded-xl border border-emerald-500 text-xs flex items-center justify-between";
-            else if (state === 'revealed') btn.className = "w-full text-left bg-rose-950 text-rose-200 font-bold px-3 py-2 rounded-xl border border-rose-500 text-xs flex items-center justify-between";
-        }
+            const base = "w-full text-left font-bold px-3 py-2 rounded-xl border text-xs flex items-center justify-between";
+            btn.className = state === "correct"
+                ? `${base} bg-emerald-950 text-emerald-200 border-emerald-500`
+                : `${base} bg-rose-950 text-rose-200 border-rose-500`;
 
-        function shuffleArray(arr) {
-            for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [arr[i], arr[j]] = [arr[j], arr[i]];
+            // En mode capitales, on affiche le pays une fois la question terminée
+            if (challengeType() === "CAPITAL") {
+                btn.innerHTML = "";
+                btn.appendChild(el("span", "truncate", `${countryById[id].capital} (${countryById[id].name})`));
             }
         }
 
-        function populateChecklist() {
-            const container = document.getElementById('country-checklist');
-            container.innerHTML = '';
-            const sorted = [...countriesList].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+        // ======================= BIBLIOTHÈQUE (recherche) =======================
+        let libType = "ALL";
+        let libDbItems = [];
+        let libDbStatus = "idle"; // idle | loading | ok | nodb | error
+        let libVisible = [];
+        let libTimer = null;
+        let libRequestId = 0;
 
-            sorted.forEach(c => {
-                const label = document.createElement('label');
+        function openLibrary() {
+            document.getElementById("library-modal").classList.remove("hidden");
+            lucide.createIcons();
+            const input = document.getElementById("lib-search");
+            input.focus();
+            input.select();
+            updateLibraryTypeButtons();
+            loadLibraryFromDb();
+        }
+
+        function closeLibrary() {
+            document.getElementById("library-modal").classList.add("hidden");
+        }
+
+        function onLibrarySearchInput() {
+            renderLibrary(); // filtre instantané des challenges officiels
+            clearTimeout(libTimer);
+            libTimer = setTimeout(loadLibraryFromDb, 250); // puis recherche dans la base
+        }
+
+        function setLibraryType(type) {
+            libType = type;
+            updateLibraryTypeButtons();
+            renderLibrary();
+        }
+
+        function updateLibraryTypeButtons() {
+            document.querySelectorAll(".lib-type-btn").forEach(btn => {
+                const active = btn.dataset.type === libType;
+                btn.className = "lib-type-btn px-3 py-1.5 rounded-lg border font-semibold transition " +
+                    (active
+                        ? "bg-indigo-600 border-indigo-400 text-white"
+                        : "bg-slate-950 border-slate-700 text-slate-300 hover:bg-slate-800");
+            });
+        }
+
+        async function loadLibraryFromDb() {
+            const requestId = ++libRequestId;
+            const q = document.getElementById("lib-search").value.trim();
+            libDbStatus = "loading";
+            renderLibrary();
+
+            try {
+                const res = await fetch(`/api/challenges?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+                if (requestId !== libRequestId) return; // une requête plus récente est en cours
+
+                if (res.status === 503) {
+                    libDbStatus = "nodb";
+                    libDbItems = [];
+                } else if (!res.ok) {
+                    throw new Error("HTTP " + res.status);
+                } else {
+                    const data = await res.json();
+                    libDbItems = (data.challenges || []).map(sanitizeChallenge).filter(Boolean);
+                    libDbItems.forEach(c => c.source = "db");
+                    libDbStatus = "ok";
+                }
+            } catch (e) {
+                if (requestId !== libRequestId) return;
+                console.warn("Recherche base de données impossible", e);
+                libDbStatus = "error";
+                libDbItems = [];
+            }
+            renderLibrary();
+        }
+
+        function renderLibrary() {
+            const q = normalizeString(document.getElementById("lib-search").value);
+            const matches = c =>
+                (libType === "ALL" || c.type === libType) &&
+                (!q || normalizeString(`${c.title} ${c.desc} ${c.author}`).includes(q));
+
+            const dbItems = libDbItems.filter(matches);
+            const presets = PRESETS.filter(matches);
+            libVisible = [...dbItems, ...presets];
+
+            // Message d'état
+            const status = document.getElementById("lib-status");
+            const statusStyles = {
+                nodb:  ["bg-amber-950/60 border-amber-500/40 text-amber-200", "Base de données non configurée : seuls les challenges officiels sont affichés."],
+                error: ["bg-rose-950/60 border-rose-500/40 text-rose-200", "Impossible de joindre la base de données (API absente en local ?). Seuls les challenges officiels sont affichés."],
+                loading: ["bg-slate-950 border-slate-800 text-slate-400", "Recherche dans la base de données..."]
+            };
+            if (statusStyles[libDbStatus]) {
+                status.className = `text-[11px] rounded-lg px-3 py-2 border ${statusStyles[libDbStatus][0]}`;
+                status.textContent = statusStyles[libDbStatus][1];
+            } else {
+                status.className = "hidden";
+            }
+
+            const container = document.getElementById("lib-results");
+            container.innerHTML = "";
+
+            if (libVisible.length === 0) {
+                container.appendChild(el("p", "text-center text-slate-500 text-sm py-8", "Aucun challenge ne correspond à ta recherche."));
+                return;
+            }
+
+            if (dbItems.length > 0) container.appendChild(buildLibrarySection("Créés par la communauté", dbItems, 0));
+            if (presets.length > 0) container.appendChild(buildLibrarySection("Challenges officiels", presets, dbItems.length));
+            lucide.createIcons();
+        }
+
+        function buildLibrarySection(title, items, offset) {
+            const section = el("div", "space-y-2");
+            section.appendChild(el("h3", "text-[11px] font-bold text-slate-400 uppercase tracking-wider", `${title} (${items.length})`));
+
+            items.forEach((c, i) => {
+                const card = el("button", "w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/60 rounded-xl px-4 py-3 transition flex items-center justify-between gap-3 active:scale-[0.99]");
+                card.onclick = () => playLibraryItem(offset + i);
+
+                const info = el("div", "min-w-0");
+                info.appendChild(el("div", "font-bold text-sm text-white truncate", c.title));
+
+                const meta = [
+                    c.type === "CAPITAL" ? "Capitales" : "Pays",
+                    `${c.countryIds.length} éléments`,
+                    c.author ? `par ${c.author}` : null
+                ].filter(Boolean).join(" · ");
+                info.appendChild(el("div", "text-[11px] text-slate-400 mt-0.5", meta));
+                if (c.desc) info.appendChild(el("div", "text-[11px] text-slate-500 mt-1 truncate", c.desc));
+
+                const play = el("span", "shrink-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg", "Jouer");
+
+                card.appendChild(info);
+                card.appendChild(play);
+                section.appendChild(card);
+            });
+            return section;
+        }
+
+        function playLibraryItem(index) {
+            const challenge = libVisible[index];
+            if (!challenge) return;
+            closeLibrary();
+
+            if (challenge.source === "db" && challenge.id) {
+                window.history.replaceState({}, document.title, `${window.location.pathname}?cId=${challenge.id}`);
+            } else {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            startChallenge(challenge);
+        }
+
+        // ======================= CRÉATION DE CHALLENGE =======================
+        function populateChecklist() {
+            const container = document.getElementById("country-checklist");
+            container.innerHTML = "";
+            document.getElementById("total-count").innerText = countriesList.length;
+
+            [...countriesList].sort((a, b) => a.name.localeCompare(b.name, "fr")).forEach(c => {
+                const label = document.createElement("label");
                 label.className = "flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer select-none text-[11px]";
-                label.innerHTML = `<input type="checkbox" value="${c.id}" onchange="updateSelectedCount()" class="chk-country rounded accent-amber-500 bg-slate-900 border-slate-700"> <span class="truncate">${c.name}</span>`;
+                label.innerHTML = `<input type="checkbox" value="${c.id}" data-region="${c.region}" onchange="updateSelectedCount()" class="chk-country rounded accent-amber-500 bg-slate-900 border-slate-700"> <span class="truncate"></span>`;
+                label.querySelector("span").textContent = c.name;
                 container.appendChild(label);
             });
         }
 
         function selectAllCountries(status) {
-            document.querySelectorAll('.chk-country').forEach(cb => cb.checked = status);
+            document.querySelectorAll(".chk-country").forEach(cb => cb.checked = status);
+            updateSelectedCount();
+        }
+
+        function selectRegion(region) {
+            document.querySelectorAll(".chk-country").forEach(cb => {
+                if (cb.dataset.region === region) cb.checked = true;
+            });
             updateSelectedCount();
         }
 
         function updateSelectedCount() {
-            const count = document.querySelectorAll('.chk-country:checked').length;
-            document.getElementById('selected-count').innerText = count;
+            document.getElementById("selected-count").innerText = document.querySelectorAll(".chk-country:checked").length;
         }
 
         function openCustomChallengeModal() {
-            document.getElementById('custom-modal').classList.remove('hidden');
+            document.getElementById("custom-modal").classList.remove("hidden");
+            document.getElementById("custom-title").focus();
         }
 
         function closeCustomChallengeModal() {
-            document.getElementById('custom-modal').classList.add('hidden');
+            document.getElementById("custom-modal").classList.add("hidden");
+        }
+
+        function buildShareUrl(challenge) {
+            const base = `${window.location.origin}${window.location.pathname}`;
+            if (challenge.source === "db" && challenge.id) return `${base}?cId=${challenge.id}`;
+            const { title, type, desc, author, countryIds } = challenge;
+            const encoded = btoa(encodeURIComponent(JSON.stringify({ title, type, desc, author, countryIds })));
+            return `${base}?c=${encoded}`;
         }
 
         async function saveAndGenerateChallenge() {
-            const title = document.getElementById('custom-title').value.trim();
-            const type = document.getElementById('custom-type').value;
-            const desc = document.getElementById('custom-desc').value.trim();
+            const title = document.getElementById("custom-title").value.trim();
+            const type = document.getElementById("custom-type").value;
+            const desc = document.getElementById("custom-desc").value.trim();
+            const author = document.getElementById("custom-author").value.trim();
+            const countryIds = Array.from(document.querySelectorAll(".chk-country:checked")).map(cb => cb.value);
 
-            const checkedNodes = document.querySelectorAll('.chk-country:checked');
-            const countryIds = Array.from(checkedNodes).map(cb => cb.value);
+            if (!title) { showToast("Donne un titre à ton challenge."); return; }
+            if (countryIds.length < 2) { showToast("Sélectionne au moins 2 pays."); return; }
 
-            if (!title) {
-                alert("Veuillez donner un titre à votre challenge.");
-                return;
-            }
-            if (countryIds.length < 2) {
-                alert("Veuillez sélectionner au moins 2 pays.");
-                return;
-            }
+            const btn = document.getElementById("save-challenge-btn");
+            btn.disabled = true;
+            btn.classList.add("opacity-60");
 
-            const challengeObj = {
-                id: 'c_' + Math.random().toString(36).substr(2, 9),
-                title: title,
-                type: type,
-                desc: desc,
-                countryIds: countryIds,
-                createdAt: Date.now()
-            };
+            let challenge = { title, type, desc, author, countryIds, createdAt: Date.now(), source: "shared", id: null };
+            let savedInDb = false;
 
-            // Attempt saving to Vercel KV if credentials exist
-            const kvUrl = localStorage.getItem('VERCEL_KV_REST_API_URL');
-            const kvToken = localStorage.getItem('VERCEL_KV_REST_API_TOKEN');
-
-            let shareUrl = "";
-
-            if (kvUrl && kvToken) {
-                try {
-                    await fetch(`${kvUrl}/set/${challengeObj.id}`, {
-                        method: 'POST',
-                        headers: { Authorization: `Bearer ${kvToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify(challengeObj)
-                    });
-                    shareUrl = `${window.location.origin}${window.location.pathname}?cId=${challengeObj.id}`;
-                } catch (err) {
-                    console.warn("Erreur Vercel DB, passage au fallback URL compressée", err);
+            try {
+                const res = await fetch("/api/challenges", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title, type, desc, author, countryIds })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const clean = sanitizeChallenge(data.challenge);
+                    if (clean) {
+                        challenge = { ...clean, source: "db" };
+                        savedInDb = true;
+                    }
                 }
+            } catch (err) {
+                console.warn("Sauvegarde en base impossible, lien compressé utilisé", err);
             }
 
-            if (!shareUrl) {
-                // Fallback compressed direct URL encoding for instant 100% universal sharing
-                const jsonStr = JSON.stringify(challengeObj);
-                const encoded = btoa(encodeURIComponent(jsonStr));
-                shareUrl = `${window.location.origin}${window.location.pathname}?c=${encoded}`;
-            }
+            btn.disabled = false;
+            btn.classList.remove("opacity-60");
 
-            // Copy link to clipboard
-            copyTextToClipboard(shareUrl);
-            alert(`🎉 Challenge "${title}" sauvegardé !\n\nLien de partage copié dans le presse-papier :\n${shareUrl}`);
+            const shareUrl = buildShareUrl(challenge);
+            const copied = await copyText(shareUrl);
+
+            if (savedInDb) {
+                showToast(copied ? "Challenge sauvegardé dans la base. Lien copié !" : "Challenge sauvegardé dans la base.", 4500);
+                window.history.replaceState({}, document.title, `${window.location.pathname}?cId=${challenge.id}`);
+            } else {
+                showToast("Base indisponible : lien autonome créé (non recherchable)." + (copied ? " Lien copié !" : ""), 5500);
+            }
 
             closeCustomChallengeModal();
-            activateCustomChallenge(challengeObj);
-        }
-
-        function activateCustomChallenge(data) {
-            activeCustomChallengeData = data;
-            currentChallengeType = data.type;
-
-            document.getElementById('custom-banner-title').innerText = data.title;
-            document.getElementById('custom-banner-desc').innerText = data.desc ? `— ${data.desc}` : '';
-            document.getElementById('custom-challenge-banner').classList.remove('hidden');
-
-            updateUIForMode();
-
-            const pool = countriesList.filter(c => data.countryIds.includes(c.id));
-            startNewSession(pool);
-        }
-
-        function resetToDefaultChallenge() {
-            activeCustomChallengeData = null;
-            document.getElementById('custom-challenge-banner').classList.add('hidden');
-            window.history.replaceState({}, document.title, window.location.pathname);
-            loadPresetChallenge();
+            ["custom-title", "custom-desc", "custom-author"].forEach(id => document.getElementById(id).value = "");
+            selectAllCountries(false);
+            startChallenge(challenge);
         }
 
         async function checkUrlForSharedChallenge() {
             const params = new URLSearchParams(window.location.search);
-            const cDataParam = params.get('c');
-            const cIdParam = params.get('cId');
+            const cDataParam = params.get("c");
+            const cIdParam = params.get("cId");
 
             if (cDataParam) {
                 try {
-                    const decodedStr = decodeURIComponent(atob(cDataParam));
-                    const challengeObj = JSON.parse(decodedStr);
-                    activateCustomChallenge(challengeObj);
-                    return;
+                    const challenge = sanitizeChallenge(JSON.parse(decodeURIComponent(atob(cDataParam))));
+                    if (challenge) {
+                        challenge.source = "shared";
+                        startChallenge(challenge);
+                        return true;
+                    }
                 } catch (e) {
                     console.error("Lien invalide", e);
                 }
+                showToast("Ce lien de challenge est invalide.");
             } else if (cIdParam) {
-                const kvUrl = localStorage.getItem('VERCEL_KV_REST_API_URL');
-                const kvToken = localStorage.getItem('VERCEL_KV_REST_API_TOKEN');
-
-                if (kvUrl && kvToken) {
-                    try {
-                        const res = await fetch(`${kvUrl}/get/${cIdParam}`, {
-                            headers: { Authorization: `Bearer ${kvToken}` }
-                        });
-                        const json = await res.json();
-                        if (json.result) {
-                            const challengeObj = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
-                            activateCustomChallenge(challengeObj);
-                            return;
+                try {
+                    const res = await fetch(`/api/challenges?id=${encodeURIComponent(cIdParam)}`, { cache: "no-store" });
+                    if (res.ok) {
+                        const data = await res.json();
+                        const challenge = sanitizeChallenge(data.challenge);
+                        if (challenge) {
+                            challenge.source = "db";
+                            startChallenge(challenge);
+                            return true;
                         }
-                    } catch (e) {
-                        console.error("Erreur de récupération Vercel DB", e);
                     }
+                } catch (e) {
+                    console.error("Erreur de récupération du challenge", e);
                 }
+                showToast("Challenge introuvable. Chargement du challenge par défaut.");
             }
+            return false;
         }
 
-        function copyCurrentChallengeShareLink() {
-            if (!activeCustomChallengeData) return;
-            const jsonStr = JSON.stringify(activeCustomChallengeData);
-            const encoded = btoa(encodeURIComponent(jsonStr));
-            const shareUrl = `${window.location.origin}${window.location.pathname}?c=${encoded}`;
-            copyTextToClipboard(shareUrl);
-            alert("Lien du challenge copié !");
+        async function copyCurrentChallengeShareLink() {
+            if (!currentChallenge || currentChallenge.source === "preset") return;
+            const ok = await copyText(buildShareUrl(currentChallenge));
+            showToast(ok ? "Lien du challenge copié !" : "Impossible de copier le lien.");
         }
 
-        function copyTextToClipboard(text) {
-            const tempInput = document.createElement("textarea");
-            tempInput.value = text;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand("copy");
-            document.body.removeChild(tempInput);
+        // ======================= CONFIG =======================
+        function openConfigModal() {
+            document.getElementById("carto-key").value = localStorage.getItem("CARTO_API_KEY") || "";
+
+            const carto = document.getElementById("status-carto");
+            if (serverCartoKey) {
+                carto.textContent = "Détectée";
+                carto.className = "font-bold text-emerald-400";
+            } else {
+                carto.textContent = "Non détectée";
+                carto.className = "font-bold text-amber-400";
+            }
+
+            const db = document.getElementById("status-db");
+            if (dbConfigured === true) {
+                db.textContent = "Connectée";
+                db.className = "font-bold text-emerald-400";
+            } else if (dbConfigured === false) {
+                db.textContent = "Non configurée";
+                db.className = "font-bold text-amber-400";
+            } else {
+                db.textContent = "API introuvable";
+                db.className = "font-bold text-rose-400";
+            }
+
+            document.getElementById("config-modal").classList.remove("hidden");
         }
 
-        function openVercelConfigModal() {
-            document.getElementById('carto-key').value = localStorage.getItem('CARTO_API_KEY') || '';
-            document.getElementById('kv-url').value = localStorage.getItem('VERCEL_KV_REST_API_URL') || '';
-            document.getElementById('kv-token').value = localStorage.getItem('VERCEL_KV_REST_API_TOKEN') || '';
-            document.getElementById('vercel-modal').classList.remove('hidden');
+        function closeConfigModal() {
+            document.getElementById("config-modal").classList.add("hidden");
         }
 
-        function closeVercelConfigModal() {
-            document.getElementById('vercel-modal').classList.add('hidden');
-        }
-
-        function saveVercelKeys() {
-            const cartoKey = document.getElementById('carto-key').value.trim();
-            const url = document.getElementById('kv-url').value.trim();
-            const token = document.getElementById('kv-token').value.trim();
-
-            if (cartoKey) localStorage.setItem('CARTO_API_KEY', cartoKey);
-            else localStorage.removeItem('CARTO_API_KEY');
-
-            if (url) localStorage.setItem('VERCEL_KV_REST_API_URL', url);
-            else localStorage.removeItem('VERCEL_KV_REST_API_URL');
-
-            if (token) localStorage.setItem('VERCEL_KV_REST_API_TOKEN', token);
-            else localStorage.removeItem('VERCEL_KV_REST_API_TOKEN');
+        function saveConfig() {
+            const cartoKey = document.getElementById("carto-key").value.trim();
+            if (cartoKey) localStorage.setItem("CARTO_API_KEY", cartoKey);
+            else localStorage.removeItem("CARTO_API_KEY");
 
             updateMapTileLayer();
-            alert("Configuration enregistrée !");
-            closeVercelConfigModal();
+            showToast("Configuration enregistrée !");
+            closeConfigModal();
         }
     </script>
 </body>
