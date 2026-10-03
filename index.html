@@ -314,7 +314,7 @@
                 <div>
                     <label class="block font-bold text-amber-400 mb-1">Clé API Carto (secours local, optionnel)</label>
                     <input type="password" id="carto-key" placeholder="Utilisée seulement si Vercel n'en fournit pas" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-[11px] outline-none focus:border-amber-500">
-                    <p class="text-[10px] text-slate-500 mt-1">La clé de Vercel (<code class="text-emerald-400">CARTO_API_KEY</code>) est prioritaire. Les fonds de carte CartoDB fonctionnent aussi sans clé.</p>
+                    <p class="text-[10px] text-slate-500 mt-1">La clé de Vercel (<code class="text-emerald-400">CARTO_API_KEY</code>) est prioritaire et n'est jamais envoyée au navigateur. Les fonds de carte CartoDB fonctionnent aussi sans clé.</p>
                 </div>
 
                 <p class="text-[11px] text-slate-400 leading-relaxed">
@@ -497,7 +497,7 @@
         let totalAnswered = 0;
         let autoZoom = true;
 
-        let serverCartoKey = "";
+        let serverCartoEnabled = false; // true si le serveur possède CARTO_API_KEY (proxy /api/tile)
         let dbConfigured = null; // null = inconnu, true/false après /api/config
 
         const challengeType = () => (currentChallenge && currentChallenge.type) || "COUNTRY";
@@ -589,7 +589,7 @@
                 const res = await fetch("/api/config", { cache: "no-store" });
                 if (res.ok) {
                     const data = await res.json();
-                    serverCartoKey = data.CARTO_API_KEY || "";
+                    serverCartoEnabled = Boolean(data.CARTO_PROXY);
                     dbConfigured = Boolean(data.DB_CONFIGURED);
                 }
             } catch (e) {
@@ -598,7 +598,7 @@
         }
 
         function getCartoKey() {
-            return serverCartoKey || localStorage.getItem("CARTO_API_KEY") || "";
+            return localStorage.getItem("CARTO_API_KEY") || "";
         }
 
         function initMap() {
@@ -622,10 +622,16 @@
         function updateMapTileLayer() {
             if (tileLayerInstance) map.removeLayer(tileLayerInstance);
 
-            const key = getCartoKey();
-            const tileUrl = key
-                ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(key)}`
-                : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+            let tileUrl;
+            if (serverCartoEnabled) {
+                // La clé reste sur le serveur : les tuiles passent par /api/tile
+                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}";
+            } else {
+                const key = getCartoKey();
+                tileUrl = key
+                    ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(key)}`
+                    : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+            }
 
             tileLayerInstance = L.tileLayer(tileUrl, {
                 attribution: "&copy; OpenStreetMap, CartoDB",
@@ -918,6 +924,7 @@
         let libType = "ALL";
         let libDbItems = [];
         let libDbStatus = "idle"; // idle | loading | ok | nodb | error
+        let libDbError = "";
         let libVisible = [];
         let libTimer = null;
         let libRequestId = 0;
@@ -983,6 +990,7 @@
                 if (requestId !== libRequestId) return;
                 console.warn("Recherche base de données impossible", e);
                 libDbStatus = "error";
+                libDbError = e && e.message ? e.message : "inconnue";
                 libDbItems = [];
             }
             renderLibrary();
@@ -1002,7 +1010,7 @@
             const status = document.getElementById("lib-status");
             const statusStyles = {
                 nodb:  ["bg-amber-950/60 border-amber-500/40 text-amber-200", "Base de données non configurée : seuls les challenges officiels sont affichés."],
-                error: ["bg-rose-950/60 border-rose-500/40 text-rose-200", "Impossible de joindre la base de données (API absente en local ?). Seuls les challenges officiels sont affichés."],
+                error: ["bg-rose-950/60 border-rose-500/40 text-rose-200", `Impossible de joindre la base de données (${libDbError}). 404 = dossier api/ absent du déploiement ou site ouvert en local ; 500 = identifiants de la base incorrects. Seuls les challenges officiels sont affichés.`],
                 loading: ["bg-slate-950 border-slate-800 text-slate-400", "Recherche dans la base de données..."]
             };
             if (statusStyles[libDbStatus]) {
@@ -1216,8 +1224,8 @@
             document.getElementById("carto-key").value = localStorage.getItem("CARTO_API_KEY") || "";
 
             const carto = document.getElementById("status-carto");
-            if (serverCartoKey) {
-                carto.textContent = "Détectée";
+            if (serverCartoEnabled) {
+                carto.textContent = "Détectée (privée, côté serveur)";
                 carto.className = "font-bold text-emerald-400";
             } else {
                 carto.textContent = "Non détectée";
