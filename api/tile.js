@@ -1,14 +1,17 @@
 // api/tile.js — Vercel Serverless Function
 // Proxy des tuiles de fond de carte : le navigateur appelle /api/tile?z=&x=&y=
 // et c'est le serveur qui ajoute CARTO_API_KEY. La clé n'est jamais envoyée au client.
-//
-// Diagnostic : /api/tile?z=2&x=1&y=1&debug=1 affiche le statut renvoyé par CARTO
-// (sans jamais afficher la clé).
 
 module.exports = async (req, res) => {
-  const { z, x, y, r, debug } = req.query;
+  const { z, x, y, r } = req.query;
 
   if (![z, x, y].every(v => /^\d{1,7}$/.test(String(v)))) {
+    return res.status(400).send('Paramètres invalides');
+  }
+  // Une tuile valide a z entre 0 et 19 et x, y < 2^z : évite d'utiliser le proxy
+  // (et ton quota CARTO) pour des requêtes absurdes.
+  const zi = Number(z), xi = Number(x), yi = Number(y);
+  if (zi > 19 || xi >= 2 ** zi || yi >= 2 ** zi) {
     return res.status(400).send('Paramètres invalides');
   }
   const retina = r === '@2x' ? '@2x' : '';
@@ -28,18 +31,6 @@ module.exports = async (req, res) => {
   try {
     const upstream = await fetch(url, { headers: { Referer: referer } });
     const buffer = Buffer.from(await upstream.arrayBuffer());
-
-    if (debug) {
-      res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({
-        carto_status: upstream.status,
-        content_type: upstream.headers.get('content-type'),
-        bytes: buffer.length,
-        key_length: key.length,
-        tile_path: path,
-        referer_sent: referer
-      });
-    }
 
     if (!upstream.ok) {
       res.setHeader('Cache-Control', 'no-store');
