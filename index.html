@@ -102,6 +102,19 @@
         input, textarea { -webkit-user-select: text; user-select: text; }
         button, select, label { touch-action: manipulation; }
 
+        /* Toggle de thème à 3 positions (style iOS) */
+        #theme-toggle { --slot: 28px; position: relative; display: flex; padding: 2px; border-radius: 999px;
+            background: rgb(var(--s800)); border: 1px solid rgb(var(--s700)); }
+        #theme-thumb { position: absolute; top: 2px; left: 2px; width: var(--slot); height: var(--slot); border-radius: 999px;
+            background: #f59e0b; box-shadow: 0 2px 5px rgba(0,0,0,.35);
+            transform: translateX(calc(var(--i, 0) * var(--slot))); transition: transform .3s ease; }
+        #theme-toggle .theme-opt { position: relative; z-index: 1; width: var(--slot); height: var(--slot); min-height: 0 !important;
+            display: flex; align-items: center; justify-content: center; border-radius: 999px;
+            color: rgb(var(--s400)); transition: color .25s; }
+        #theme-toggle .theme-opt[aria-checked="true"] { color: #0f172a; }
+        @media (pointer: coarse) { #theme-toggle { --slot: 34px; } }
+        @media (prefers-reduced-motion: reduce) { #theme-thumb { transition: none; } }
+
         .no-scrollbar { scrollbar-width: none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
@@ -191,7 +204,12 @@
                     <i data-lucide="plus-circle" class="w-4 h-4"></i> Créer<span class="hidden sm:inline">&nbsp;un challenge</span>
                 </button>
 
-                <button id="theme-btn" onclick="cycleTheme()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Changer de thème" aria-label="Changer de thème"></button>
+                <div id="theme-toggle" role="radiogroup" aria-label="Thème d'affichage" class="shrink-0">
+                    <span id="theme-thumb" aria-hidden="true"></span>
+                    <button type="button" role="radio" data-theme-key="dark" onclick="applyTheme('dark')" title="Thème sombre" aria-label="Thème sombre" class="theme-opt"><i data-lucide="moon" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" role="radio" data-theme-key="light" onclick="applyTheme('light')" title="Thème clair" aria-label="Thème clair" class="theme-opt"><i data-lucide="sun" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" role="radio" data-theme-key="hc" onclick="applyTheme('hc')" title="Contraste élevé" aria-label="Contraste élevé" class="theme-opt"><i data-lucide="contrast" class="w-3.5 h-3.5"></i></button>
+                </div>
 
                 <button onclick="openConfigModal()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration" aria-label="Configuration">
                     <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> <span class="hidden sm:inline">Config</span>
@@ -702,17 +720,13 @@
             const theme = THEMES.find(t => t.key === key) || THEMES[0];
             document.documentElement.dataset.theme = theme.key;
             document.querySelector('meta[name="theme-color"]').setAttribute("content", theme.meta);
-            const btn = document.getElementById("theme-btn");
-            btn.innerHTML = `<i data-lucide="${theme.icon}" class="w-4 h-4 text-emerald-400"></i><span class="hidden sm:inline">${theme.label}</span>`;
+            document.getElementById("theme-toggle").style.setProperty("--i", THEMES.indexOf(theme));
+            document.querySelectorAll(".theme-opt").forEach(btn =>
+                btn.setAttribute("aria-checked", btn.dataset.themeKey === theme.key));
             lucide.createIcons();
             if (save) { try { localStorage.setItem("THEME", theme.key); } catch (e) {} }
             updateBorders();
             repaintResults();   // redessine les contours des pays colorés
-        }
-
-        function cycleTheme() {
-            const current = THEMES.findIndex(t => t.key === document.documentElement.dataset.theme);
-            applyTheme(THEMES[(current + 1) % THEMES.length].key);
         }
 
         // ======================= INITIALISATION =======================
