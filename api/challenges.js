@@ -24,6 +24,8 @@ const KV_TOKEN = findEnv('REST_API_TOKEN', 'REST_TOKEN');
 const INDEX_KEY = 'challenges:index';
 const MAX_RESULTS = 100;
 const MAX_INDEX_SCAN = 500;
+const MAX_TOTAL_CHALLENGES = 2000;   // plafond de la base (anti-spam)
+const POSTS_PER_HOUR = 10;           // limite par adresse IP
 
 async function redis(command) {
   const response = await fetch(KV_URL, {
@@ -61,7 +63,31 @@ function cleanText(value, max) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+
+// Refuse les POST venant d'un autre site (protection CSRF / abus depuis un domaine tiers).
+function isSameOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true; // outils type curl : pas d'en-tête Origin, la limite par IP s'applique
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Limite de débit par IP, stockée dans Redis. L'IP est hachée : on ne conserve pas l'adresse brute.
+async function tooManyPosts(req) {
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const ip = fwd || (req.socket && req.socket.remoteAddress) || 'unknown';
+  const hash = crypto.createHash('sha256').update(ip).digest('hex').slice(0, 24);
+  const key = `ratelimit:post:${hash}`;
+  const count = await redis(['INCR', key]);
+  if (count === 1) await redis(['EXPIRE', key, 3600]);
+  return count > POSTS_PER_HOUR;
+}
+
 module.exports = async (req, res) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Cache-Control', 'no-store');
 
   if (!KV_URL || !KV_TOKEN) {
@@ -107,6 +133,17 @@ module.exports = async (req, res) => {
 
     // ---------- SAUVEGARDE ----------
     if (req.method === 'POST') {
+      if (!isSameOrigin(req)) {
+        return res.status(403).json({ error: 'Origine non autorisée' });
+      }
+      if (await tooManyPosts(req)) {
+        res.setHeader('Retry-After', '3600');
+        return res.status(429).json({ error: 'Trop de challenges créés, réessaie plus tard' });
+      }
+      if ((await redis(['SCARD', INDEX_KEY])) >= MAX_TOTAL_CHALLENGES) {
+        return res.status(507).json({ error: 'Bibliothèque pleine' });
+      }
+
       let body = req.body;
       if (typeof body === 'string') body = parse(body);
       if (!body || typeof body !== 'object') {
