@@ -630,16 +630,16 @@
 
             if (serverCartoEnabled) {
                 // La clé reste sur le serveur : les tuiles passent par /api/tile
-                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}&v=3"; // v=3 : contourne les anciennes tuiles filigranées en cache
+                tileUrl = "/api/tile?z={z}&x={x}&y={y}&r={r}&v=4"; // v=4 : contourne les anciennes tuiles (avec noms ou filigrane) en cache
                 options = { attribution: "&copy; OpenStreetMap, CARTO", maxZoom: 19 };
             } else if (localKey) {
                 // CARTO exige désormais ?key= sur le chemin /rastertiles/
-                tileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(localKey)}`;
+                tileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(localKey)}`;
                 options = { attribution: "&copy; OpenStreetMap, CARTO", subdomains: "abcd", maxZoom: 19 };
             } else {
-                // Sans clé, CARTO affiche un filigrane : on utilise OpenStreetMap assombri
-                tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-                options = { attribution: "&copy; OpenStreetMap", maxZoom: 19, className: "osm-dark-tiles" };
+                // Sans clé, CARTO affiche un filigrane : fond sombre Esri, sans noms
+                tileUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+                options = { attribution: "Tiles &copy; Esri", maxZoom: 16 };
             }
 
             tileLayerInstance = L.tileLayer(tileUrl, options).addTo(map);
