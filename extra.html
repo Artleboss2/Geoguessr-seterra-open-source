@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <script>window.addEventListener("error",function(e){if(!e||!e.message)return;var d=document.createElement("div");d.id="gm-error-bar";
+        d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7f1d1d;color:#fff;font:12px/1.4 monospace;padding:8px 12px;word-break:break-word";
+        d.textContent="Erreur JavaScript : "+e.message+(e.lineno?" (ligne "+e.lineno+")":"");document.documentElement.appendChild(d);});</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>GeoMaster - Challenges & Cartes Personnalisées</title>
+    <script>(function(){
+        var t=null,h=null;
+        try{t=localStorage.getItem("GM_THEME");h=localStorage.getItem("GM_HC");}catch(e){}
+        if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";}
+        document.documentElement.dataset.theme=t;
+        document.documentElement.dataset.hc=(h==="1")?"on":"off";
+    })();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { slate: {
+            100: "rgb(var(--s100) / <alpha-value>)", 200: "rgb(var(--s200) / <alpha-value>)",
+            300: "rgb(var(--s300) / <alpha-value>)", 400: "rgb(var(--s400) / <alpha-value>)",
+            500: "rgb(var(--s500) / <alpha-value>)", 600: "rgb(var(--s600) / <alpha-value>)",
+            700: "rgb(var(--s700) / <alpha-value>)", 800: "rgb(var(--s800) / <alpha-value>)",
+            900: "rgb(var(--s900) / <alpha-value>)", 950: "rgb(var(--s950) / <alpha-value>)"
+        } } } } };
+    </script>
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"
+            integrity="sha384-hJnF5AwidE18GSWTAGHv3ByzzvfNZ1Tcx5y1UUV3WkauuMCEzBJBMSwSt/PUPXnM" crossorigin="anonymous"
+            onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js';s.integrity='sha384-hJnF5AwidE18GSWTAGHv3ByzzvfNZ1Tcx5y1UUV3WkauuMCEzBJBMSwSt/PUPXnM';s.crossOrigin='anonymous';s.onload=function(){if(window.refreshIcons)refreshIcons();};document.head.appendChild(s);"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+    
+    <style>
+        /* ======================= THÈMES : sombre / clair, + contraste élevé ======================= */
+        :root, html[data-theme="dark"] {
+            --s100: 241 245 249; --s200: 226 232 240; --s300: 203 213 225; --s400: 148 163 184; --s500: 100 116 139;
+            --s600: 71 85 105; --s700: 51 65 85; --s800: 30 41 59; --s900: 15 23 42; --s950: 2 6 23;
+            --map-bg: 11 15 25; color-scheme: dark;
+        }
+        html[data-theme="light"] {
+            --s100: 15 23 42; --s200: 30 41 59; --s300: 51 65 85; --s400: 71 85 105; --s500: 100 116 139;
+            --s600: 148 163 184; --s700: 203 213 225; --s800: 226 232 240; --s900: 255 255 255; --s950: 241 245 249;
+            --map-bg: 236 240 245; color-scheme: light;
+        }
+
+        /* Clair : fond de carte inversé + textes colorés plus foncés */
+        html[data-theme="light"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.97) contrast(0.92); }
+        html[data-theme="light"] .text-amber-300, html[data-theme="light"] .text-amber-400 { color: #b45309; }
+        html[data-theme="light"] .text-emerald-400 { color: #047857; }
+        html[data-theme="light"] .text-rose-400 { color: #be123c; }
+        html[data-theme="light"] #stat-progress { color: #4338ca; }
+
+        /* Contraste élevé sur fond sombre */
+        html[data-theme="dark"][data-hc="on"] .leaflet-tile-pane { filter: brightness(0.5) saturate(1.3) contrast(1.15); }
+        html[data-theme="dark"][data-hc="on"] .border-slate-800, html[data-theme="dark"][data-hc="on"] #map-panel { border-color: #ffffff !important; }
+
+        /* Bouton contraste élevé (on / off) */
+        #hc-btn { width: 34px; height: 34px; min-height: 0 !important; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+            background: rgb(var(--s800)); border: 1px solid rgb(var(--s700)); color: rgb(var(--s400)); transition: background .25s, color .25s; }
+        #hc-btn[aria-pressed="true"] { background: #f59e0b; border-color: #f59e0b; color: #0f172a; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgb(var(--s950)); }
+        ::-webkit-scrollbar-thumb { background: rgb(var(--s700)); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgb(var(--s600)); }
+
+        #map { background-color: rgb(var(--map-bg)); z-index: 1; }
+
+        .highlighted-country {
+            fill: #f59e0b !important;
+            fill-opacity: 0.75 !important;
+            stroke: #fef08a !important;
+            stroke-width: 2.5px !important;
+            filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.9));
+            animation: pulse-glow 1.6s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            from { fill-opacity: 0.55; stroke-width: 2px; filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6)); }
+            to   { fill-opacity: 0.90; stroke-width: 3.5px; filter: drop-shadow(0 0 14px rgba(245, 158, 11, 1)); }
+        }
+
+        .leaflet-container { font-family: inherit; }
+
+        /* ======================= RESPONSIVE ======================= */
+        html, body { height: 100%; overscroll-behavior: none; }
+        body {
+            height: 100vh; height: 100dvh;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #app-header { padding-top: max(0.5rem, env(safe-area-inset-top)); }
+
+        #theme-toggle { --slot: 28px; position: relative; display: flex; padding: 2px; border-radius: 999px;
+            background: rgb(var(--s800)); border: 1px solid rgb(var(--s700)); }
+        #theme-thumb { position: absolute; top: 2px; left: 2px; width: var(--slot); height: var(--slot); border-radius: 999px;
+            background: #f59e0b; box-shadow: 0 2px 5px rgba(0,0,0,.35);
+            transform: translateX(calc(var(--i, 0) * var(--slot))); transition: transform .3s ease; }
+        #theme-toggle .theme-opt { position: relative; z-index: 1; width: var(--slot); height: var(--slot); min-height: 0 !important;
+            display: flex; align-items: center; justify-content: center; border-radius: 999px;
+            color: rgb(var(--s400)); transition: color .25s; }
+        #theme-toggle .theme-opt[aria-checked="true"] { color: #0f172a; }
+
+        .no-scrollbar { scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        #workspace { display: flex; flex-direction: column; }
+        #map-panel { position: relative; isolation: isolate; z-index: 0; flex: 0 0 40%; min-height: 180px; border-bottom: 1px solid rgb(var(--s800)); }
+        #side-panel { flex: 1 1 0; min-height: 0; }
+
+        @media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
+            #workspace { flex-direction: row; }
+            #map-panel { flex: 0 0 58%; min-height: 0; border-bottom: 0; border-right: 1px solid rgb(var(--s800)); }
+        }
+
+        /* Styles spécifique pour la fenêtre de Cheat */
+        #cheat-window {
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 15px rgba(245, 158, 11, 0.3);
+            backdrop-filter: blur(12px);
+            touch-action: none;
+        }
+        .cheat-toggle-checkbox:checked + .cheat-toggle-bg {
+            background-color: #f59e0b;
+        }
+        .cheat-toggle-checkbox:checked + .cheat-toggle-bg .cheat-toggle-dot {
+            transform: translateX(1.25rem);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden select-none">
+
+    <!-- Top Header Navigation -->
+    <header id="app-header" class="bg-slate-900 border-b border-slate-800 px-3 sm:px-4 pb-2 shrink-0 shadow-xl z-20">
+        <div class="w-full flex flex-wrap 2xl:flex-nowrap justify-between items-center gap-x-3 gap-y-2">
+
+            <div class="hidden sm:flex items-center gap-2.5 min-w-0 order-1 flex-1 2xl:flex-none">
+                <div class="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 sm:p-2 rounded-xl text-[#0f172a] shadow-lg shadow-amber-500/20 shrink-0">
+                    <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="font-black text-base sm:text-lg tracking-tight text-slate-100 flex items-center gap-2">
+                        GeoMaster <span id="mode-badge" class="bg-amber-500/20 text-amber-400 text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-md border border-amber-500/30 whitespace-nowrap">Mode Pays</span>
+                    </h1>
+                    <p id="mode-subtitle" class="hidden sm:block hide-on-short text-xs text-slate-400 truncate">Trouve le pays ou la capitale du pays surligné (4 essais)</p>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="order-2 2xl:order-3 ml-auto flex items-center gap-1.5 sm:gap-5 bg-slate-950/80 px-2 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-slate-800/80 shadow-inner shrink-0">
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Score</span>
+                    <span id="stat-score" class="font-extrabold text-sm sm:text-base text-emerald-400">0%</span>
+                </div>
+                <div class="w-px h-5 bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Série</span>
+                    <span id="stat-streak" class="font-extrabold text-sm sm:text-base text-amber-400">0 🔥</span>
+                </div>
+                <div class="w-px h-5 bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Progression</span>
+                    <span id="stat-progress" class="font-extrabold text-sm sm:text-base text-indigo-400 whitespace-nowrap">0 / 0</span>
+                </div>
+            </div>
+
+            <!-- Challenge selector & buttons -->
+            <div id="header-actions" class="order-1 sm:order-3 2xl:order-2 flex-1 min-w-0 sm:flex-none sm:w-full 2xl:w-auto 2xl:flex-1 2xl:min-w-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible 2xl:flex-nowrap 2xl:justify-center">
+                <button onclick="openLibrary()" aria-label="Rechercher un challenge" class="shrink-0 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-2.5 sm:px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="search" class="w-4 h-4"></i><span class="hidden sm:inline">Rechercher un challenge</span>
+                </button>
+
+                <select id="preset-select" onchange="onPresetChange()" class="hidden sm:block shrink-0 bg-slate-950 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[200px] sm:max-w-[220px]">
+                </select>
+
+                <button onclick="openCustomChallengeModal()" aria-label="Créer un challenge" class="shrink-0 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#0f172a] font-bold px-2.5 sm:px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition active:scale-95 whitespace-nowrap">
+                    <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Créer un challenge</span>
+                </button>
+
+                <div id="theme-toggle" role="radiogroup" aria-label="Thème d'affichage" class="shrink-0">
+                    <span id="theme-thumb" aria-hidden="true"></span>
+                    <button type="button" role="radio" data-theme-key="dark" onclick="setTheme('dark')" title="Thème sombre" class="theme-opt"><i data-lucide="moon" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" role="radio" data-theme-key="light" onclick="setTheme('light')" title="Thème clair" class="theme-opt"><i data-lucide="sun" class="w-3.5 h-3.5"></i></button>
+                </div>
+
+                <button id="hc-btn" type="button" onclick="toggleContrast()" aria-pressed="false" title="Contraste élevé" class="shrink-0"><i data-lucide="contrast" class="w-4 h-4"></i></button>
+
+                <button onclick="openConfigModal()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 sm:px-3 py-2 rounded-xl text-xs border border-slate-700 font-medium flex items-center gap-1.5 transition active:scale-95" title="Configuration">
+                    <i data-lucide="settings" class="w-4 h-4 text-emerald-400"></i> <span class="hidden sm:inline">Config</span>
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Custom Challenge Active Banner -->
+    <div id="custom-challenge-banner" class="hidden bg-indigo-950/90 border-b border-indigo-500/40 px-3 sm:px-4 py-1.5 sm:py-2 text-xs flex items-center justify-between gap-2 z-10 shrink-0">
+        <div class="flex items-center gap-2 text-indigo-200 font-medium min-w-0">
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400 shrink-0"></i>
+            <span class="truncate">Challenge : <strong id="custom-banner-title" class="text-white">--</strong></span>
+            <span id="custom-banner-desc" class="text-indigo-300/80 text-[11px] hidden md:inline truncate"></span>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <button onclick="copyCurrentChallengeShareLink()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition">
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Copier<span class="hidden sm:inline">&nbsp;le lien</span>
+            </button>
+            <button onclick="resetToDefaultChallenge()" class="text-indigo-300 hover:text-white text-xs underline">
+                Quitter
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <main id="workspace" class="flex-1 min-h-0 overflow-hidden relative">
+
+        <!-- Map Panel -->
+        <div id="map-panel">
+            <div id="map" class="w-full h-full"></div>
+
+            <div class="absolute top-2.5 left-2.5 sm:top-4 sm:left-4 z-[1000] bg-slate-900/90 border border-slate-700/80 backdrop-blur-md px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-semibold text-amber-300 flex items-center gap-2 shadow-xl">
+                <span class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                </span>
+                <span id="target-map-label">Cible surlignée sur la carte</span>
+            </div>
+
+            <div class="absolute bottom-6 left-2.5 sm:bottom-4 sm:left-4 z-[1000] flex flex-wrap gap-1.5 sm:gap-2">
+                <button onclick="resetMapView()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-[11px] sm:text-xs font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+                    <i data-lucide="globe" class="w-4 h-4 text-slate-400"></i> Vue globale
+                </button>
+                <button id="btn-auto-zoom" onclick="toggleAutoZoom()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-[11px] sm:text-xs font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 shadow-xl flex items-center gap-1.5 backdrop-blur-md transition active:scale-95">
+                    <i data-lucide="zoom-in" class="w-4 h-4 text-amber-400"></i> <span id="zoom-toggle-text">Zoom auto : OUI</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar Panel -->
+        <div id="side-panel" class="bg-slate-900/95 flex flex-col overflow-hidden">
+
+            <div class="p-3 sm:p-4 border-b border-slate-800 space-y-2.5 sm:space-y-3 shrink-0 bg-slate-900">
+                <div class="flex items-center justify-between">
+                    <span id="target-prompt" class="text-xs font-bold uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="help-circle" class="w-4 h-4"></i> Tape le nom du pays
+                    </span>
+                </div>
+
+                <form onsubmit="handleTypeSubmit(event)" class="relative">
+                    <input type="text" id="type-input" placeholder="Tape ta réponse..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"
+                           class="w-full bg-slate-950 border-2 border-slate-700 text-slate-100 placeholder-slate-500 rounded-xl px-4 py-3 pl-10 text-sm font-medium focus:border-amber-500 focus:outline-none transition shadow-inner">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
+                    <button type="submit" class="absolute right-2 top-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[#0f172a] font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-md transition active:scale-95">
+                        Valider
+                    </button>
+                </form>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <button onclick="revealAnswer()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md">
+                        <i data-lucide="eye" class="w-4 h-4"></i> Révéler la réponse
+                    </button>
+                    <button onclick="skipQuestion()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1 transition active:scale-95">
+                        Passer <i data-lucide="skip-forward" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feedback Banner -->
+            <div id="feedback-banner" class="hidden shrink-0 mx-3 sm:mx-4 mt-3 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between gap-3 shadow-lg transition-all">
+                <span id="feedback-text" class="flex items-center gap-2"></span>
+                <button id="next-btn" class="hidden bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-xs transition">
+                    Suivant
+                </button>
+            </div>
+
+            <!-- Scrollable List -->
+            <div class="flex-1 p-3 sm:p-4 overflow-y-auto min-h-0">
+                <div class="flex items-center justify-between mb-2.5">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ou clique dans la liste :</span>
+                    <span id="country-count" class="text-xs font-semibold text-slate-500 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">0 éléments</span>
+                </div>
+
+                <div id="country-list" class="grid grid-cols-2 gap-1.5"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ======================= FENÊTRE DE CHEAT (MENU TRICHE) ======================= -->
+    <div id="cheat-window" class="hidden fixed top-20 left-10 z-[9999] w-80 bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl overflow-hidden shadow-2xl transition-opacity">
+        <!-- En-tête déplaçable -->
+        <div id="cheat-header" class="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 px-3 py-2 flex justify-between items-center cursor-move text-slate-950 font-black text-xs select-none shadow-md">
+            <span class="flex items-center gap-1.5">
+                <i data-lucide="zap" class="w-4 h-4 fill-current"></i> CHEAT MENU (/artleboss2)
+            </span>
+            <div class="flex items-center gap-1">
+                <button onclick="minimizeCheatWindow()" class="hover:bg-amber-700/30 p-1 rounded transition text-slate-950 font-bold" title="Réduire">
+                    <i data-lucide="minus" class="w-4 h-4"></i>
+                </button>
+                <button onclick="closeCheatWindow()" class="hover:bg-amber-700/30 p-1 rounded transition text-slate-950 font-bold" title="Fermer">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Corps des options de triche -->
+        <div class="p-4 space-y-3.5 text-xs">
+            <!-- Interrupteur God Mode -->
+            <div class="flex items-center justify-between bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/30">
+                <div class="flex flex-col">
+                    <span class="font-bold text-amber-400 flex items-center gap-1">
+                        <i data-lucide="crown" class="w-4 h-4"></i> God Mode
+                    </span>
+                    <span class="text-[10px] text-slate-400">Active toutes les triches simultanément</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="cheat-godmode" onchange="toggleCheatOption('godMode')" class="sr-only cheat-toggle-checkbox">
+                    <div class="cheat-toggle-bg w-9 h-5 bg-slate-700 rounded-full transition-colors relative">
+                        <div class="cheat-toggle-dot absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform"></div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Interrupteur Auto-Full -->
+            <div class="flex items-center justify-between bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                <div class="flex flex-col">
+                    <span class="font-bold text-slate-200 flex items-center gap-1">
+                        <i data-lucide="bot" class="w-4 h-4 text-indigo-400"></i> Auto-Full
+                    </span>
+                    <span class="text-[10px] text-slate-400">Régler automatiquement les bonnes réponses</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="cheat-autofull" onchange="toggleCheatOption('autofull')" class="sr-only cheat-toggle-checkbox">
+                    <div class="cheat-toggle-bg w-9 h-5 bg-slate-700 rounded-full transition-colors relative">
+                        <div class="cheat-toggle-dot absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform"></div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Interrupteur Série Infinie -->
+            <div class="flex items-center justify-between bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                <div class="flex flex-col">
+                    <span class="font-bold text-slate-200 flex items-center gap-1">
+                        <i data-lucide="infinity" class="w-4 h-4 text-emerald-400"></i> Série Infinie
+                    </span>
+                    <span class="text-[10px] text-slate-400">Série continue & sauvegardée à vie</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="cheat-infinite" onchange="toggleCheatOption('infiniteSerie')" class="sr-only cheat-toggle-checkbox">
+                    <div class="cheat-toggle-bg w-9 h-5 bg-slate-700 rounded-full transition-colors relative">
+                        <div class="cheat-toggle-dot absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform"></div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Interrupteur Série Saver -->
+            <div class="flex items-center justify-between bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                <div class="flex flex-col">
+                    <span class="font-bold text-slate-200 flex items-center gap-1">
+                        <i data-lucide="shield-check" class="w-4 h-4 text-rose-400"></i> Serie Saver
+                    </span>
+                    <span class="text-[10px] text-slate-400">Empêche la perte de la série en cas d'erreur</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="cheat-saver" onchange="toggleCheatOption('serieSaver')" class="sr-only cheat-toggle-checkbox">
+                    <div class="cheat-toggle-bg w-9 h-5 bg-slate-700 rounded-full transition-colors relative">
+                        <div class="cheat-toggle-dot absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform"></div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Bouton d'action manuelle -->
+            <button onclick="executeAutoSolveCurrent()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Valider la question en cours
+            </button>
+        </div>
+    </div>
+
+    <!-- Icône flottante réduite déplaçable -->
+    <div id="cheat-mini-icon" onclick="restoreCheatWindow()" class="hidden fixed bottom-12 right-6 z-[9998] bg-amber-500 text-slate-950 p-3 rounded-full shadow-2xl border-2 border-white cursor-pointer hover:scale-110 active:scale-95 transition flex items-center justify-center">
+        <i data-lucide="crown" class="w-6 h-6 fill-current"></i>
+    </div>
+
+    <!-- Modals standard -->
+    <div id="library-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
+                <div class="flex items-center gap-2 text-indigo-300 font-bold text-base">
+                    <i data-lucide="library" class="w-5 h-5"></i> Bibliothèque de challenges
+                </div>
+                <button onclick="closeLibrary()" class="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-4 border-b border-slate-800 space-y-3 shrink-0">
+                <input type="text" id="lib-search" oninput="onLibrarySearchInput()" placeholder="Cherche par titre, description ou auteur..." class="w-full bg-slate-950 border-2 border-slate-700 text-slate-100 rounded-xl px-4 py-2.5 text-sm">
+            </div>
+            <div id="lib-results" class="p-4 overflow-y-auto flex-1 space-y-4 min-h-0"></div>
+        </div>
+    </div>
+
+    <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <div class="flex items-center gap-2 text-amber-400 font-bold text-base"><i data-lucide="plus-circle" class="w-5 h-5"></i> Créer un challenge</div>
+                <button onclick="closeCustomChallengeModal()" class="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Titre du challenge *</label>
+                    <input type="text" id="custom-title" maxlength="80" placeholder="ex: Capitales d'Europe" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Type de devinette *</label>
+                    <select id="custom-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100">
+                        <option value="COUNTRY">Deviner les pays</option>
+                        <option value="CAPITAL">Deviner les capitales</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3 max-h-56 overflow-y-auto" id="country-checklist"></div>
+            </div>
+            <div class="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-2 shrink-0">
+                <button onclick="closeCustomChallengeModal()" class="px-4 py-2 rounded-xl text-slate-400 font-semibold">Annuler</button>
+                <button onclick="saveAndGenerateChallenge()" class="bg-amber-500 text-slate-950 font-bold px-5 py-2 rounded-xl">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="config-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl p-6">
+            <h3 class="text-emerald-400 font-bold mb-4">Configuration</h3>
+            <button onclick="closeConfigModal()" class="bg-slate-800 text-slate-200 px-4 py-2 rounded-xl text-xs font-medium">Fermer</button>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" style="bottom: calc(1.25rem + env(safe-area-inset-bottom))" class="hidden fixed left-1/2 -translate-x-1/2 z-[2000] max-w-[90vw] bg-slate-800 border border-slate-600 text-slate-100 text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl"></div>
+
+    <script>
+        // ======================= DONNÉES PAYS =======================
+        const countriesList = [
+            { id: "CAN", name: "Canada", capital: "Ottawa", region: "Americas", aliases: ["canada", "can"], capitalAliases: ["ottawa"] },
+            { id: "USA", name: "États-Unis", capital: "Washington", region: "Americas", aliases: ["etats unis", "etats-unis", "usa", "us"], capitalAliases: ["washington", "washington dc"] },
+            { id: "MEX", name: "Mexique", capital: "Mexico", region: "Americas", aliases: ["mexique", "mexico"], capitalAliases: ["mexico", "mexico city"] },
+            { id: "FRA", name: "France", capital: "Paris", region: "Europe", aliases: ["france"], capitalAliases: ["paris"] },
+            { id: "ESP", name: "Espagne", capital: "Madrid", region: "Europe", aliases: ["espagne", "spain"], capitalAliases: ["madrid"] },
+            { id: "DEU", name: "Allemagne", capital: "Berlin", region: "Europe", aliases: ["allemagne", "germany"], capitalAliases: ["berlin"] },
+            { id: "ITA", name: "Italie", capital: "Rome", region: "Europe", aliases: ["italie", "italy"], capitalAliases: ["rome", "roma"] },
+            { id: "GBR", name: "Royaume-Uni", capital: "Londres", region: "Europe", aliases: ["royaume-uni", "uk"], capitalAliases: ["londres", "london"] },
+            { id: "CHN", name: "Chine", capital: "Pékin", region: "Asia", aliases: ["chine", "china"], capitalAliases: ["pekin", "beijing"] },
+            { id: "JPN", name: "Japon", capital: "Tokyo", region: "Asia", aliases: ["japon", "japan"], capitalAliases: ["tokyo"] },
+            { id: "BRA", name: "Brésil", capital: "Brasilia", region: "Americas", aliases: ["bresil", "brazil"], capitalAliases: ["brasilia"] },
+            { id: "MAR", name: "Maroc", capital: "Rabat", region: "Africa", aliases: ["maroc"], capitalAliases: ["rabat"] }
+        ];
+
+        const countryById = Object.fromEntries(countriesList.map(c => [c.id, c]));
+        const GEO_ALT_IDS = {};
+
+        const PRESETS = [
+            { id: "WORLD_COUNTRY", title: "Monde – Pays", type: "COUNTRY", countryIds: countriesList.map(c => c.id), source: "preset" },
+            { id: "WORLD_CAPITAL", title: "Monde – Capitales", type: "CAPITAL", countryIds: countriesList.map(c => c.id), source: "preset" }
+        ];
+
+        let map, tileLayerInstance = null, highlightedLayer = null, resultGroup = null, worldGeoData = null;
+        const GEO_LOW_URL = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
+
+        let currentChallenge = null, fullPool = [], activePool = [], currentTarget = null, answered = false;
+        let streak = 0, totalAnswered = 0, pointsTotal = 0, attempts = 0, results = {};
+        let advanceTimer = null, autoZoom = true;
+
+        const MAX_ATTEMPTS = 4;
+        const POINTS = [1, 2 / 3, 1 / 3, 1 / 3];
+        const RESULT_STYLES = {
+            white: { fill: "#ffffff", btn: "bg-white text-[#0f172a]" },
+            light: { fill: "#fde68a", btn: "bg-yellow-200 text-[#0f172a]" },
+            dark:  { fill: "#ca8a04", btn: "bg-yellow-600 text-white" },
+            red:   { fill: "#dc2626", btn: "bg-red-600 text-white" }
+        };
+
+        const challengeType = () => (currentChallenge && currentChallenge.type) || "COUNTRY";
+
+        function refreshIcons() {
+            try { if (window.lucide) window.lucide.createIcons(); } catch (e) {}
+        }
+
+        function normalizeString(str) {
+            return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function showToast(message, duration = 3500) {
+            const t = document.getElementById("toast");
+            t.textContent = message;
+            t.classList.remove("hidden");
+            setTimeout(() => t.classList.add("hidden"), duration);
+        }
+
+        // ======================= THÈMES =======================
+        function getAppearance() {
+            const d = document.documentElement.dataset;
+            return { theme: d.theme === "light" ? "light" : "dark", hc: d.hc === "on" };
+        }
+
+        function applyAppearance(theme, hc) {
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.dataset.hc = hc ? "on" : "off";
+        }
+
+        function setTheme(t) { applyAppearance(t, getAppearance().hc); }
+        function toggleContrast() { const a = getAppearance(); applyAppearance(a.theme, !a.hc); }
+
+        // ======================= MAP & GAME ENGINE =======================
+        document.addEventListener("DOMContentLoaded", () => {
+            buildPresetSelect();
+            populateChecklist();
+            initMap();
+            initCheatSystem();
+            startChallenge(PRESETS[0]);
+            refreshIcons();
+        });
+
+        function initMap() {
+            map = L.map("map", { center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 7, zoomControl: false });
+            L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16 }).addTo(map);
+            resultGroup = L.layerGroup().addTo(map);
+
+            fetch(GEO_LOW_URL).then(r => r.json()).then(data => {
+                worldGeoData = data;
+                if (currentTarget) highlightTargetOnMap(currentTarget);
+            }).catch(() => {});
+        }
+
+        function buildPresetSelect() {
+            const select = document.getElementById("preset-select");
+            select.innerHTML = PRESETS.map(p => `<option value="${p.id}">${p.title}</option>`).join("");
+        }
+
+        function onPresetChange() {
+            const id = document.getElementById("preset-select").value;
+            const preset = PRESETS.find(p => p.id === id);
+            if (preset) startChallenge(preset);
+        }
+
+        function startChallenge(data) {
+            currentChallenge = data;
+            startNewSession(countriesList.filter(c => data.countryIds.includes(c.id)));
+        }
+
+        function startNewSession(pool) {
+            clearTimeout(advanceTimer);
+            if (!cheatState.infiniteSerie && !cheatState.godMode) {
+                streak = 0;
+            } else {
+                streak = parseInt(localStorage.getItem("GM_INFINITE_STREAK") || streak || 0);
+            }
+            totalAnswered = 0;
+            pointsTotal = 0;
+            attempts = 0;
+            results = {};
+            if (resultGroup) resultGroup.clearLayers();
+            fullPool = [...pool];
+            activePool = [...pool];
+            shuffleArray(activePool);
+            updateDashboard();
+            renderCountryList();
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            clearTimeout(advanceTimer);
+            document.getElementById("feedback-banner").classList.add("hidden");
+            answered = false;
+            attempts = 0;
+
+            const inputField = document.getElementById("type-input");
+            inputField.value = "";
+            inputField.focus();
+
+            if (activePool.length === 0) {
+                currentTarget = null;
+                if (highlightedLayer) { map.removeLayer(highlightedLayer); highlightedLayer = null; }
+                showFeedback(`🎉 Session terminée ! Score : ${getPercent()} %`, "bg-indigo-600 text-white", true, "Rejouer", () => startNewSession(fullPool));
+                return;
+            }
+
+            currentTarget = activePool.pop();
+            document.getElementById("target-map-label").innerText = `Cible ${totalAnswered + 1} / ${fullPool.length}`;
+            highlightTargetOnMap(currentTarget);
+
+            // Hook Cheat Auto-Full
+            if (cheatState.autofull || cheatState.godMode) {
+                setTimeout(() => { if (!answered && currentTarget) executeAutoSolveCurrent(); }, 400);
+            }
+        }
+
+        function highlightTargetOnMap(country) {
+            if (!worldGeoData || !map) return;
+            if (highlightedLayer) { map.removeLayer(highlightedLayer); }
+
+            const feature = worldGeoData.features.find(f => f.properties && (f.properties.ADM0_A3 === country.id || f.properties.ISO_A3 === country.id));
+            if (feature) {
+                highlightedLayer = L.geoJSON(feature, { style: { className: "highlighted-country" } }).addTo(map);
+                if (autoZoom) map.flyToBounds(highlightedLayer.getBounds(), { maxZoom: 5, duration: 1 });
+            }
+        }
+
+        function getPercent() {
+            return totalAnswered ? Math.round((pointsTotal / totalAnswered) * 100) : 0;
+        }
+
+        function answerText() {
+            return challengeType() === "CAPITAL" ? `${currentTarget.capital} (${currentTarget.name})` : currentTarget.name;
+        }
+
+        function handleTypeSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById("type-input");
+            const val = input.value.trim();
+
+            // DÉTECTION DU CHEAT DEVERROUILLAGE
+            if (val === "/artleboss2") {
+                input.value = "";
+                activateGodModeCheat();
+                return;
+            }
+
+            if (answered || !val || !currentTarget) return;
+
+            const inputVal = normalizeString(val);
+            let isCorrect = challengeType() === "CAPITAL"
+                ? (currentTarget.capitalAliases.some(a => normalizeString(a) === inputVal) || normalizeString(currentTarget.capital) === inputVal)
+                : (currentTarget.aliases.some(a => normalizeString(a) === inputVal) || normalizeString(currentTarget.name) === inputVal);
+
+            if (isCorrect) handleSuccess();
+            else handleFailure("Mauvaise réponse !");
+        }
+
+        function handleSuccess() {
+            const state = attempts === 0 ? "white" : "light";
+            streak++;
+            if (cheatState.infiniteSerie || cheatState.godMode) {
+                localStorage.setItem("GM_INFINITE_STREAK", streak);
+            }
+            finishQuestion(state, POINTS[attempts] || 0.33, `Bravo ! C'est ${answerText()}`, "bg-emerald-950 text-emerald-200", 900);
+        }
+
+        function handleFailure(msg) {
+            attempts++;
+            // Cheat Serie Saver / God Mode empêche la perte de la série
+            if (!cheatState.serieSaver && !cheatState.godMode && !cheatState.infiniteSerie) {
+                streak = 0;
+            }
+            if (attempts >= MAX_ATTEMPTS) {
+                finishQuestion("red", 0, `❌ C'était : ${answerText()}`, "bg-rose-950 text-rose-200", 2000);
+                return;
+            }
+            updateDashboard();
+            showFeedback(`${msg} (essai ${attempts}/${MAX_ATTEMPTS})`, "bg-amber-950 text-amber-200", false);
+        }
+
+        function finishQuestion(state, points, msg, bgClass, delay) {
+            answered = true;
+            totalAnswered++;
+            pointsTotal += points;
+            results[currentTarget.id] = state;
+            updateDashboard();
+            showFeedback(msg, bgClass, true);
+            advanceTimer = setTimeout(nextQuestion, delay);
+        }
+
+        function showFeedback(text, bgClass, showNext) {
+            const banner = document.getElementById("feedback-banner");
+            document.getElementById("feedback-text").innerText = text;
+            banner.className = `shrink-0 mx-3 sm:mx-4 mt-3 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-3 ${bgClass}`;
+            banner.classList.remove("hidden");
+            document.getElementById("next-btn").classList.toggle("hidden", !showNext);
+        }
+
+        function updateDashboard() {
+            document.getElementById("stat-score").innerText = `${getPercent()}%`;
+            document.getElementById("stat-streak").innerText = `${streak} 🔥`;
+            document.getElementById("stat-progress").innerText = `${totalAnswered} / ${fullPool.length}`;
+        }
+
+        function renderCountryList() {
+            const listEl = document.getElementById("country-list");
+            listEl.innerHTML = fullPool.map(c => `
+                <button onclick="selectCountryFromList('${c.id}')" class="w-full text-left bg-slate-950 hover:bg-slate-800 text-slate-300 font-medium px-3 py-2 rounded-xl border border-slate-800 text-xs truncate">
+                    ${challengeType() === "CAPITAL" ? c.capital : c.name}
+                </button>
+            `).join("");
+        }
+
+        function selectCountryFromList(id) {
+            if (!currentTarget || answered) return;
+            if (id === currentTarget.id) handleSuccess();
+            else handleFailure("Ce n'est pas le bon choix !");
+        }
+
+        function revealAnswer() {
+            if (!currentTarget || answered) return;
+            if (!cheatState.serieSaver && !cheatState.godMode) streak = 0;
+            finishQuestion("red", 0, `C'était : ${answerText()}`, "bg-rose-950 text-rose-200", 2000);
+        }
+
+        function skipQuestion() { nextQuestion(); }
+        function toggleAutoZoom() { autoZoom = !autoZoom; }
+        function resetMapView() { map.setView([20, 0], 2); }
+
+        function openLibrary() { document.getElementById("library-modal").classList.remove("hidden"); }
+        function closeLibrary() { document.getElementById("library-modal").classList.add("hidden"); }
+        function openCustomChallengeModal() { document.getElementById("custom-modal").classList.remove("hidden"); }
+        function closeCustomChallengeModal() { document.getElementById("custom-modal").classList.add("hidden"); }
+        function openConfigModal() { document.getElementById("config-modal").classList.remove("hidden"); }
+        function closeConfigModal() { document.getElementById("config-modal").classList.add("hidden"); }
+        function populateChecklist() {}
+        function saveAndGenerateChallenge() { closeCustomChallengeModal(); }
+
+        // ======================= SYSTÈME DE CHEAT (/artleboss2) =======================
+        let cheatState = {
+            active: false,
+            godMode: false,
+            autofull: false,
+            infiniteSerie: false,
+            serieSaver: false
+        };
+
+        function initCheatSystem() {
+            setupDraggableWindow(document.getElementById("cheat-window"), document.getElementById("cheat-header"));
+            setupDraggableWindow(document.getElementById("cheat-mini-icon"), document.getElementById("cheat-mini-icon"));
+        }
+
+        function activateGodModeCheat() {
+            cheatState.active = true;
+            cheatState.godMode = true;
+            cheatState.autofull = true;
+            cheatState.infiniteSerie = true;
+            cheatState.serieSaver = true;
+
+            syncCheatTogglesUI();
+            document.getElementById("cheat-window").classList.remove("hidden");
+            document.getElementById("cheat-mini-icon").classList.add("hidden");
+
+            showToast("👑 GOD MODE ACTIVÉ ! Menu de Cheat Déverrouillé.", 4000);
+
+            // Si une question est en cours, la résoudre automatiquement
+            if (currentTarget && !answered) {
+                executeAutoSolveCurrent();
+            }
+        }
+
+        function toggleCheatOption(opt) {
+            if (opt === 'godMode') {
+                const val = document.getElementById("cheat-godmode").checked;
+                cheatState.godMode = val;
+                cheatState.autofull = val;
+                cheatState.infiniteSerie = val;
+                cheatState.serieSaver = val;
+            } else {
+                cheatState[opt] = document.getElementById(`cheat-${opt === 'infiniteSerie' ? 'infinite' : opt === 'serieSaver' ? 'saver' : opt}`).checked;
+                if (!cheatState[opt]) cheatState.godMode = false;
+            }
+            syncCheatTogglesUI();
+            
+            if (cheatState.autofull && currentTarget && !answered) {
+                executeAutoSolveCurrent();
+            }
+        }
+
+        function syncCheatTogglesUI() {
+            document.getElementById("cheat-godmode").checked = cheatState.godMode;
+            document.getElementById("cheat-autofull").checked = cheatState.autofull;
+            document.getElementById("cheat-infinite").checked = cheatState.infiniteSerie;
+            document.getElementById("cheat-saver").checked = cheatState.serieSaver;
+        }
+
+        function executeAutoSolveCurrent() {
+            if (!currentTarget || answered) return;
+            handleSuccess();
+        }
+
+        function minimizeCheatWindow() {
+            document.getElementById("cheat-window").classList.add("hidden");
+            document.getElementById("cheat-mini-icon").classList.remove("hidden");
+        }
+
+        function restoreCheatWindow() {
+            document.getElementById("cheat-window").classList.remove("hidden");
+            document.getElementById("cheat-mini-icon").classList.add("hidden");
+        }
+
+        function closeCheatWindow() {
+            document.getElementById("cheat-window").classList.add("hidden");
+            document.getElementById("cheat-mini-icon").classList.add("hidden");
+        }
+
+        // Fonction générique pour rendre un élément HTML déplaçable (Souris + Tactile)
+        function setupDraggableWindow(element, handle) {
+            let posX = 0, posY = 0, initialX = 0, initialY = 0;
+
+            handle.onmousedown = dragStart;
+            handle.ontouchstart = dragStart;
+
+            function dragStart(e) {
+                e = e || window.event;
+                if (e.type === "touchstart") {
+                    initialX = e.touches[0].clientX - element.offsetLeft;
+                    initialY = e.touches[0].clientY - element.offsetTop;
+                } else {
+                    initialX = e.clientX - element.offsetLeft;
+                    initialY = e.clientY - element.offsetTop;
+                }
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+                document.ontouchend = closeDragElement;
+                document.ontouchmove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                if (e.type === "touchmove") {
+                    posX = e.touches[0].clientX - initialX;
+                    posY = e.touches[0].clientY - initialY;
+                } else {
+                    posX = e.clientX - initialX;
+                    posY = e.clientY - initialY;
+                }
+                element.style.top = Math.max(0, Math.min(window.innerHeight - 50, posY)) + "px";
+                element.style.left = Math.max(0, Math.min(window.innerWidth - 50, posX)) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                document.ontouchend = null;
+                document.ontouchmove = null;
+            }
+        }
+    </script>
+</body>
+</html>
